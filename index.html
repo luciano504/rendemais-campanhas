@@ -1,0 +1,1083 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rende Mais Campanhas</title>
+<meta name="theme-color" content="#184f95">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Campanhas">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href='data:application/manifest+json,{"name":"Rende Mais Campanhas","short_name":"Campanhas","start_url":".","display":"standalone","background_color":"%23f4f4f1","theme_color":"%23184f95","icons":[]}'>
+<style>
+:root{
+  color-scheme: light dark;
+  --surface:#fcfcfb; --plane:#f4f4f1; --card:#ffffff; --line:#e3e2dd;
+  --ink:#0b0b0b; --ink2:#52514e; --muted:#898781;
+  --good:#0ca30c; --warn:#fab219; --crit:#d03b3b;
+  --brand:#2a78d6; --brand-ink:#184f95; --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{--surface:#1a1a19; --plane:#0d0d0d; --card:#1f1f1e; --line:#333331;
+        --ink:#ffffff; --ink2:#c3c2b7; --brand:#3987e5;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--plane);color:var(--ink);
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
+header{position:sticky;top:0;z-index:20;background:var(--brand-ink);color:#fff;padding:10px 14px;
+  display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0;font-weight:650}
+header .sp{flex:1}
+header .st{font-size:12px;background:#ffffff22;border-radius:99px;padding:3px 10px}
+nav{display:flex;gap:4px;overflow-x:auto;background:var(--surface);border-bottom:1px solid var(--line);
+  padding:6px 10px;position:sticky;top:44px;z-index:19}
+nav button{border:0;background:transparent;color:var(--ink2);padding:7px 12px;border-radius:99px;
+  white-space:nowrap;cursor:pointer;font:inherit}
+nav button.on{background:var(--brand);color:#fff;font-weight:600}
+main{padding:14px;max-width:1180px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:12px}
+.card h2{font-size:15px;margin:0 0 10px;font-weight:650}
+.card h3{font-size:13px;margin:14px 0 6px;font-weight:650;color:var(--ink2);text-transform:uppercase;letter-spacing:.4px}
+label{display:block;font-size:12px;color:var(--ink2);margin-bottom:3px}
+input,select,textarea{width:100%;padding:8px 9px;border:1px solid var(--line);border-radius:8px;
+  background:var(--surface);color:var(--ink);font:inherit}
+input[type=checkbox]{width:auto}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row>div{flex:1 1 150px;min-width:0}
+button.b{background:var(--brand);color:#fff;border:0;border-radius:8px;padding:9px 14px;cursor:pointer;font:inherit;font-weight:600}
+button.g{background:var(--good)} button.d{background:var(--crit)}
+button.o{background:transparent;color:var(--ink);border:1px solid var(--line)}
+button.s{padding:5px 10px;font-size:13px}
+button:disabled{opacity:.45;cursor:not-allowed}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);
+  font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+.tw{overflow-x:auto}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);background:var(--surface);
+  border-radius:99px;padding:4px 11px;font-size:13px;cursor:pointer;user-select:none}
+.chip.on{background:var(--brand);border-color:var(--brand);color:#fff;font-weight:600}
+.tag{display:inline-flex;align-items:center;gap:4px;border-radius:99px;padding:2px 9px;font-size:11.5px;font-weight:650;border:1px solid transparent}
+.tag.ok{color:var(--good);border-color:var(--good)}
+.tag.wait{color:var(--brand);border-color:var(--brand)}
+.tag.warn{color:#8a6100;border-color:var(--warn);background:#fab21922}
+.tag.bad{color:var(--crit);border-color:var(--crit)}
+.tag.off{color:var(--muted);border-color:var(--line)}
+.meter{height:10px;border-radius:99px;background:var(--line);overflow:hidden;position:relative}
+.meter i{display:block;height:100%;border-radius:99px}
+.meter .lim{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--muted);opacity:.8}
+.kpi{display:flex;gap:10px;flex-wrap:wrap}
+.kpi>div{flex:1 1 150px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px}
+.kpi b{display:block;font-size:21px;font-variant-numeric:tabular-nums;margin-top:2px}
+.kpi span{font-size:11.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.alert{border-left:4px solid var(--crit);background:#d03b3b14;padding:9px 11px;border-radius:6px;font-size:13px;margin:8px 0}
+.alert.w{border-color:var(--warn);background:#fab21918}
+.alert.i{border-color:var(--brand);background:#2a78d614}
+.small{font-size:12px;color:var(--muted)}
+.itembox{border:1px solid var(--line);border-radius:var(--r);padding:11px;margin-bottom:10px;background:var(--surface)}
+.itembox.bad{border-color:var(--crit)}
+.hd{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;flex-wrap:wrap}
+.hist{font-size:12px;color:var(--ink2);border-left:2px solid var(--line);padding-left:9px;margin:3px 0}
+dialog{border:0;border-radius:12px;padding:0;max-width:560px;width:94%;background:var(--card);color:var(--ink)}
+dialog .in{padding:16px} dialog::backdrop{background:#0008}
+#load{position:fixed;inset:auto 12px 12px auto;background:var(--brand-ink);color:#fff;padding:8px 14px;
+  border-radius:99px;font-size:13px;display:none;z-index:50}
+</style>
+</head>
+<body>
+<header>
+  <h1>Rende Mais Campanhas</h1>
+  <span class="st" id="stConn">conectando…</span>
+  <div class="sp"></div>
+  <select id="perfil" style="max-width:230px"></select>
+</header>
+<nav id="nav"></nav>
+<main id="app"></main>
+<div id="load">carregando…</div>
+<dialog id="dlg"><div class="in" id="dlgIn"></div></dialog>
+
+<script>
+/* =====================================================================
+   RENDE MAIS CAMPANHAS — v5 (verbas de fomento por item)
+   Lê a MESMA base do app Data Crítica (Supabase estciwkeihmokvlnvaum):
+     produtos(ean, descricao, secao)
+     produtos_loja(ean, loja, id_fornecedor, nome_fornecedor, ultimo_custo,
+                   preco_venda, estoque, vmd)
+     vendas_dia(ean, loja, data, qtd)      -> apuração da verba
+     usuarios(id, nome, papel, loja, ativo, ids_fornecedor)
+   Fornecedores são AGLUTINADOS pela razão social normalizada (mesma regra
+   do relatório mensal do Data Crítica: trim + maiúsculas + espaços únicos),
+   somando todos os id_fornecedor daquela razão social.
+   Regras da verba:
+     verba unitária sugerida = preço cheio − preço sugerido pelo fornecedor
+     margem-alvo da seção    = piso de referência (alerta)
+     limites de ORÇAMENTO e de PERÍODO, por item e pela campanha
+     alerta em 70%; 100% suspende (campanha esgotada desfaz tudo)
+   Campanhas, itens, aceites e histórico ficam NO BANCO (schema_campanhas.sql),
+   para o fornecedor acompanhar e aceitar de qualquer lugar, do celular dele.
+   Login: o mesmo usuário/PIN do Data Crítica (usuarios.pin_hash = sha256).
+   ===================================================================== */
+const CFG={ url:(location.search.match(/[?&]api=([^&]+)/)||[])[1]
+              ? decodeURIComponent(RegExp.$1) : "https://estciwkeihmokvlnvaum.supabase.co",
+            key:"sb_publishable_l14fjxQmWUeu5OXlZJ35GA_-X3ESkgZ" };
+const LOJAS={L01:"Veneza",L02:"Máximo",L03:"Royal",L04:"Lojão",L05:"Alvorada",L08:"Tradição",L09:"Massangana"};
+const LS='rendeMaisCampanhas_v5';
+const LS_ANTIGO='verbasRM_v5';   // migra dados de quem já usou a versão anterior
+
+const fmt=n=>(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtR=n=>'R$ '+fmt(n);
+const pct=n=>((+n||0)*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
+const hoje=()=>S.hojeSim||new Date().toISOString().slice(0,10);
+const dbr=d=>d?String(d).slice(0,10).split('-').reverse().join('/'):'—';
+const uid=()=>Math.random().toString(36).slice(2,9);
+const el=h=>{const d=document.createElement('div');d.innerHTML=h.trim();return d.firstChild};
+const soDig=s=>String(s||'').replace(/\D/g,'');
+const semZ=s=>soDig(s).replace(/^0+/,'');
+// chave de aglutinação de fornecedor — igual à do Data Crítica
+const chaveForn=n=>String(n||'(sem nome)').trim().toUpperCase().replace(/\s+/g,' ');
+
+let S=null, VIEW='', SEL=null, ONLINE=false, DB=false, DRAFT=null, TIMER=null;
+const CACHE={itens:{}};                      // fornKey -> lista de produtos
+const sha256=async t=>{ if(!crypto?.subtle) return null;
+  const b=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(t));
+  return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,'0')).join(''); };
+
+/* ---------------- acesso ao Supabase (REST) ---------------- */
+function loading(b){ document.getElementById('load').style.display=b?'block':'none' }
+async function sb(path,opts){
+  const r=await fetch(CFG.url+'/rest/v1/'+path,{...opts,headers:{apikey:CFG.key,
+    Authorization:'Bearer '+CFG.key,'Content-Type':'application/json',...(opts||{}).headers}});
+  if(!r.ok) throw new Error(r.status+' '+(await r.text()).slice(0,200));
+  return r.json();
+}
+async function sbPag(path,campo,limite=50000){       // paginação por Range
+  const out=[]; let de=0, passo=1000;
+  while(de<limite){
+    const r=await fetch(CFG.url+'/rest/v1/'+path,{headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key,
+      Range:`${de}-${de+passo-1}`,'Range-Unit':'items'}});
+    if(!r.ok) throw new Error(r.status+' '+(await r.text()).slice(0,160));
+    const d=await r.json(); out.push(...d);
+    if(d.length<passo) break; de+=passo;
+  }
+  return out;
+}
+
+async function sbPost(tabela,corpo,prefer){
+  return sb(tabela,{method:'POST',body:JSON.stringify(corpo),
+    headers:{Prefer:prefer||'return=representation'}});
+}
+async function sbPatch(tabela,filtro,corpo){
+  const r=await fetch(`${CFG.url}/rest/v1/${tabela}?${filtro}`,{method:'PATCH',
+    headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key,'Content-Type':'application/json',Prefer:'return=minimal'},
+    body:JSON.stringify(corpo)});
+  if(!r.ok) throw new Error(r.status+' '+(await r.text()).slice(0,160));
+}
+
+/* ---------------- estado ---------------- */
+function vazio(){ return {secoes:{},reps:[],campanhas:[],alertas:[],vendas:{},principais:[],
+                          hojeSim:null,perfil:null,sessao:null,pctAlerta:.70,demo:false} }
+function load(){
+  try{S=JSON.parse(localStorage.getItem(LS)||localStorage.getItem(LS_ANTIGO))||vazio()}catch(e){S=vazio()}
+  S=Object.assign(vazio(),S);
+}
+function save(){ localStorage.setItem(LS,JSON.stringify(S)) }
+
+/* ---------------- carga do cadastro real ---------------- */
+let FORN=[], USERS=[];
+async function conectar(){
+  const st=document.getElementById('stConn');
+  try{
+    loading(true); st.textContent='lendo o cadastro do Data Crítica…';
+    // 1) fornecedores: usa a view v_fornecedores_verbas se existir; senão varre produtos_loja
+    let linhas=[];
+    try{ linhas=await sb('v_fornecedores_lista?select=id_fornecedor,nome_fornecedor'); }
+    catch(e){ linhas=await sbPag('produtos_loja?select=id_fornecedor,nome_fornecedor&id_fornecedor=not.is.null','',60000); }
+    const mapa={};
+    linhas.forEach(l=>{ if(!l.id_fornecedor) return;
+      const k=chaveForn(l.nome_fornecedor);
+      const a=mapa[k]||(mapa[k]={key:k,nome:l.nome_fornecedor||'(sem nome)',ids:new Set()});
+      a.ids.add(l.id_fornecedor); });
+    FORN=Object.values(mapa).map(a=>({key:a.key,nome:a.nome,ids:[...a.ids]}))
+      .sort((a,b)=>a.nome.localeCompare(b.nome));
+    // 2) usuários (mesmos logins do Data Crítica)
+    try{ USERS=await sb('usuarios?select=id,nome,papel,loja,ids_fornecedor&ativo=eq.true&order=nome') }
+    catch(e){ USERS=await sb('usuarios?select=id,nome,papel,loja&ativo=eq.true&order=nome') }
+    ONLINE=true; S.demo=false;
+    // 3) as campanhas moram no banco? (schema_campanhas.sql aplicado)
+    try{ await sb('campanhas?select=id&limit=1'); DB=true }catch(e){ DB=false }
+    if(DB) await dbCarregar();
+    st.textContent=`✅ base do VR · ${FORN.length} fornecedores`+(DB?' · campanhas no banco':' · ⚠️ campanhas só neste navegador');
+  }catch(e){
+    ONLINE=false; S.demo=true; demoBase();
+    st.textContent='⚠️ sem conexão — modo demonstração';
+    console.warn('Supabase:',e.message);
+  }finally{ loading(false); save(); }
+}
+function demoBase(){
+  FORN=[{key:'DISTRIBUIDORA NORDESTE ALIMENTOS LTDA',nome:'Distribuidora Nordeste Alimentos LTDA',ids:[1201,1202]},
+        {key:'BEBIDAS RECIFE S/A',nome:'Bebidas Recife S/A',ids:[1310]},
+        {key:'HIGIPLUS COMERCIAL LTDA',nome:'HigiPlus Comercial LTDA',ids:[1455]}];
+  USERS=[{id:'u0',nome:'Gestor Comercial',papel:'gestor'},
+    ...FORN.map((f,i)=>({id:'uf'+i,nome:f.nome,papel:'fornecedor',ids_fornecedor:f.ids.join(',')}))];
+  const P=[['7891000100103','Leite Condensado 395g','Mercearia',4.62,6.49,'DISTRIBUIDORA NORDESTE ALIMENTOS LTDA',1201],
+    ['7896036090015','Arroz Parboilizado 1kg','Mercearia',3.85,4.99,'DISTRIBUIDORA NORDESTE ALIMENTOS LTDA',1201],
+    ['7891910000197','Açúcar Refinado 1kg','Mercearia',3.20,4.29,'DISTRIBUIDORA NORDESTE ALIMENTOS LTDA',1202],
+    ['7891097000133','Requeijão 200g','Laticínios',5.10,7.49,'DISTRIBUIDORA NORDESTE ALIMENTOS LTDA',1201],
+    ['7894900011517','Refrigerante Cola 2L','Bebidas',5.90,8.49,'BEBIDAS RECIFE S/A',1310],
+    ['7891991000581','Cerveja Lata 350ml','Bebidas',2.55,3.49,'BEBIDAS RECIFE S/A',1310],
+    ['7891035000119','Detergente 500ml','Limpeza',1.75,2.49,'HIGIPLUS COMERCIAL LTDA',1455],
+    ['7896098900017','Shampoo 350ml','Higiene',9.80,14.90,'HIGIPLUS COMERCIAL LTDA',1455]];
+  CACHE.itens={};
+  P.forEach(([ean,desc,secao,custo,preco,fk,idf])=>{
+    (CACHE.itens[fk]=CACHE.itens[fk]||[]).push({ean,desc,secao,idf,
+      lojas:Object.fromEntries(Object.keys(LOJAS).map(l=>[l,{custo,preco,estoque:30}]))});
+  });
+}
+
+/* ---------------- campanhas no banco (acesso remoto do fornecedor) ---------------- */
+const d10=v=>v?String(v).slice(0,10):'';        // aceita date ou timestamp
+const mapItemDe=i=>({id:String(i.id),ean:i.ean,desc:i.descricao,secao:i.secao,
+  preco:+i.preco_sugerido,verbaSug:+i.verba_sugerida,verba:+i.verba_unitaria,
+  orcamento:+i.orcamento_item||0,inicio:d10(i.inicio_item),fim:d10(i.fim_item),
+  custoRef:+i.custo_ref,precoRef:+i.preco_ref,alvoRef:+i.margem_alvo_ref,status:i.status});
+const mapCampDe=r=>({id:String(r.id),fornKey:r.fornecedor_chave,nome:r.nome,inicio:d10(r.inicio),fim:d10(r.fim),
+  orcamento:+r.orcamento_total,lojas:r.lojas||[],repId:r.representante_id?String(r.representante_id):'',
+  origem:r.origem,pagamento:r.pagamento,status:r.status,criadaEm:r.criada_em,
+  itens:(r.campanha_itens||[]).map(mapItemDe).sort((a,b)=>a.desc.localeCompare(b.desc)),
+  eventos:(r.campanha_eventos||[]).map(e=>({id:String(e.id),data:e.criado_em,tipo:e.tipo,
+    item:(e.para||{}).item||null,autor:(e.para||{}).autor||'',msg:e.mensagem}))
+    .sort((a,b)=>String(b.data).localeCompare(String(a.data)))});
+const itemPara=(it,campId)=>({campanha_id:campId,ean:it.ean,descricao:it.desc,secao:it.secao,
+  preco_sugerido:+it.preco||0,verba_sugerida:+it.verbaSug||0,verba_unitaria:+it.verba||0,
+  orcamento_item:+it.orcamento||null,inicio_item:it.inicio||null,fim_item:it.fim||null,
+  custo_ref:+it.custoRef||0,preco_ref:+it.precoRef||0,margem_alvo_ref:+it.alvoRef||0,status:it.status});
+
+async function dbCarregar(){
+  if(!DB) return;
+  const fk=fornDoUsuario();
+  const filtro=ehGestor()?'':`&fornecedor_chave=eq.${encodeURIComponent(fk||'-')}`;
+  const cs=await sb(`campanhas?select=*,campanha_itens(*),campanha_eventos(*)&order=criada_em.desc${filtro}`);
+  S.campanhas=cs.map(mapCampDe);
+  try{
+    S.reps=(await sb('representantes?select=*&ativo=eq.true')).map(r=>({id:String(r.id),fornKey:r.fornecedor_chave,
+      nome:r.nome,cargo:r.cargo,email:r.email,tel:r.telefone,alerta:r.recebe_alertas}));
+    S.principais=(await sb('fornecedores_principais?select=fornecedor_chave')).map(r=>r.fornecedor_chave);
+    (await sb('secoes_margem?select=*')).forEach(r=>S.secoes[r.secao]=+r.margem_alvo);
+  }catch(e){ console.warn('cadastros auxiliares:',e.message) }
+  await apurar(true);          // o consumo vem do banco para os DOIS lados
+  save();
+}
+async function recarregar(silencioso){
+  if(!DB){ if(!silencioso) alert('As campanhas ainda não estão no banco — rode o schema_campanhas.sql.'); return }
+  try{ await dbCarregar(); render() }catch(e){ if(!silencioso) alert('Falha ao atualizar: '+e.message) }
+}
+async function dbNovaCampanha(c){
+  const f=FORN.find(x=>x.key===c.fornKey)||{ids:[]};
+  const nova=(await sbPost('campanhas',{fornecedor_chave:c.fornKey,ids_fornecedor:f.ids,nome:c.nome,
+    inicio:c.inicio,fim:c.fim,orcamento_total:+c.orcamento||0,lojas:c.lojas,
+    representante_id:c.repId?+c.repId:null,origem:c.origem,pagamento:c.pagamento,status:c.status,
+    criada_por:idUsuarioBanco()}))[0];
+  await sbPost('campanha_itens',c.itens.map(it=>itemPara(it,nova.id)),'return=minimal');
+  await dbEvento(nova.id,null,'proposta',(c.eventos[0]||{}).msg||'Campanha criada.');
+  return String(nova.id);
+}
+async function dbSyncCamp(c){
+  if(!DB||!/^\d+$/.test(c.id)) return;
+  try{
+    await sbPatch('campanhas',`id=eq.${c.id}`,{nome:c.nome,inicio:c.inicio,fim:c.fim,
+      orcamento_total:+c.orcamento||0,lojas:c.lojas,pagamento:c.pagamento,status:c.status,
+      representante_id:c.repId?+c.repId:null});
+    for(const it of c.itens){
+      if(/^\d+$/.test(it.id)) await sbPatch('campanha_itens',`id=eq.${it.id}`,itemPara(it,+c.id));
+    }
+  }catch(e){ console.warn('sync campanha:',e.message) }
+}
+async function dbEvento(campId,itemId,tipo,msg){
+  if(!DB||!/^\d+$/.test(String(campId))) return;
+  try{ await sbPost('campanha_eventos',{campanha_id:+campId,item_id:itemId&&/^\d+$/.test(itemId)?+itemId:null,
+    tipo,mensagem:msg,autor_id:idUsuarioBanco(),papel:usuario()?.papel,
+    para:{autor:usuario()?.nome||'',item:null}},'return=minimal') }catch(e){}
+}
+const idUsuarioBanco=()=>{ const u=usuario(); return u&&/^\d+$/.test(String(u.id))?+u.id:null };
+
+/* itens de um fornecedor (todas as lojas), com custo e preço reais */
+async function itensDoForn(fk){
+  if(CACHE.itens[fk]) return CACHE.itens[fk];
+  const f=FORN.find(x=>x.key===fk); if(!f) return [];
+  loading(true);
+  try{
+    const pl=await sbPag(`produtos_loja?select=ean,loja,ultimo_custo,preco_venda,estoque,id_fornecedor,nome_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',40000);
+    const eans=[...new Set(pl.map(x=>x.ean))];
+    const descr={};
+    for(let i=0;i<eans.length;i+=300){
+      const parte=eans.slice(i,i+300).map(e=>`"${e}"`).join(',');
+      (await sb(`produtos?select=ean,descricao,secao&ean=in.(${parte})`)).forEach(p=>descr[p.ean]=p);
+    }
+    const m={};
+    pl.forEach(r=>{
+      const it=m[r.ean]||(m[r.ean]={ean:r.ean,desc:(descr[r.ean]||{}).descricao||r.ean,
+        secao:(descr[r.ean]||{}).secao||'(sem seção)',idf:r.id_fornecedor,lojas:{}});
+      it.lojas[r.loja]={custo:+r.ultimo_custo||0,preco:+r.preco_venda||0,estoque:+r.estoque||0};
+    });
+    CACHE.itens[fk]=Object.values(m).sort((a,b)=>a.desc.localeCompare(b.desc));
+  }catch(e){ alert('Não consegui ler os itens: '+e.message); CACHE.itens[fk]=[] }
+  finally{ loading(false) }
+  return CACHE.itens[fk];
+}
+const itensCache=fk=>CACHE.itens[fk]||[];
+function achaEAN(fk,ean){ const a=semZ(ean);
+  return itensCache(fk).find(p=>semZ(p.ean)===a)||null; }
+function achaEANqualquer(ean){ const a=semZ(ean);
+  for(const k in CACHE.itens){ const p=CACHE.itens[k].find(x=>semZ(x.ean)===a); if(p) return {p,fk:k} }
+  return null; }
+
+/* referências de custo e preço cheio nas lojas da campanha */
+function refs(prd,lojas){
+  const ls=(lojas||Object.keys(LOJAS)).map(l=>prd.lojas[l]).filter(Boolean);
+  if(!ls.length) return {custo:0,preco:0,precoMin:0,precoMax:0};
+  const precos=ls.map(x=>x.preco).filter(x=>x>0), custos=ls.map(x=>x.custo).filter(x=>x>0);
+  return {custo:Math.max(...custos,0), preco:Math.max(...precos,0),
+          precoMin:Math.min(...precos,0||Infinity), precoMax:Math.max(...precos,0)};
+}
+
+/* ---------------- regras ---------------- */
+const alvoSecao=s=>S.secoes[s]!==undefined?S.secoes[s]:.20;
+function verbaSugerida(precoCheio,precoPromo){ return Math.max(0,+((+precoCheio||0)-(+precoPromo||0)).toFixed(4)) }
+function margemCom(p,c,v){ return p? (p-(c-v))/p : 0 }
+function margemRS(p,c,v){ return (+p||0)-((+c||0)-(+v||0)) }
+const ehGestor=()=>usuario()?.papel==='gestor';
+const usuario=()=>USERS.find(u=>String(u.id)===String(S.perfil));
+function fornDoUsuario(){
+  const u=usuario(); if(!u||u.papel==='gestor') return null;
+  const ids=String(u.ids_fornecedor||u.id_fornecedor||'').split(',').map(x=>parseInt(x)).filter(Boolean);
+  const f=FORN.find(x=>x.ids.some(i=>ids.includes(+i)));
+  return f?f.key:null;
+}
+function minhasCamps(){ const f=fornDoUsuario();
+  return S.campanhas.filter(c=>ehGestor()||c.fornKey===f) }
+const camp=id=>S.campanhas.find(c=>c.id===id);
+function itemPeriodo(c,it){ return {ini:it.inicio||c.inicio, fim:it.fim||c.fim} }
+function consumoItem(c,it){
+  const per=itemPeriodo(c,it); let un=0;
+  Object.entries(S.vendas).forEach(([k,q])=>{
+    const [ean,loja,data]=k.split('|');
+    if(semZ(ean)!==semZ(it.ean)) return;
+    if(!c.lojas.includes(loja)) return;
+    if(data<per.ini||data>per.fim) return;
+    un+=q;
+  });
+  return {un,verba:un*(+it.verba||0)};
+}
+function consumoCamp(c){ return c.itens.reduce((a,it)=>{const x=consumoItem(c,it);
+  return {un:a.un+x.un, verba:a.verba+x.verba}},{un:0,verba:0}) }
+function itemVigente(c,it){
+  if(it.status!=='aprovado'||c.status!=='vigente') return false;
+  const p=itemPeriodo(c,it), h=hoje(); return h>=p.ini&&h<=p.fim;
+}
+function statusTag(st){
+  const m={rascunho:['off','Rascunho'],aguardando_aceite:['wait','Aguardando o Gestor'],
+    aguardando_fornecedor:['wait','Aguardando o Fornecedor'],vigente:['ok','Vigente'],aprovado:['ok','Aprovado'],
+    recusado:['bad','Recusado'],recusada:['bad','Recusada'],suspenso_orcamento:['bad','Suspenso (orçamento)'],
+    suspensa_orcamento:['bad','Suspensa (orçamento)'],estancado:['off','Estancado'],estancada:['off','Estancada'],
+    encerrado:['off','Encerrado'],encerrada:['off','Encerrada']};
+  const [k,t]=m[st]||['off',st]; return `<span class="tag ${k}">${t}</span>`;
+}
+function ev(c,it,tipo,msg){
+  (c.eventos=c.eventos||[]).unshift({id:uid(),data:new Date().toISOString(),tipo,item:it?it.desc:null,autor:usuario()?.nome,msg});
+  dbEvento(c.id,it?it.id:null,tipo,(it?it.desc+' — ':'')+msg);
+}
+function alerta(nivel,tipo,msg,campId,itemId){
+  if(S.alertas.some(a=>a.tipo===tipo)) return;
+  S.alertas.unshift({id:uid(),nivel,tipo,msg,campId,itemId:itemId||null,data:new Date().toISOString(),lido:false});
+}
+
+/* ---------------- motor de limites ---------------- */
+function avaliar(){
+  const h=hoje();
+  S.campanhas.forEach(c=>{
+    if(!['vigente','suspensa_orcamento'].includes(c.status)) return;
+    const antes=c.status+'|'+c.itens.map(i=>i.status).join(',');
+    const cc=consumoCamp(c).verba;
+    const mudou=()=>antes!==c.status+'|'+c.itens.map(i=>i.status).join(',');
+    if(c.fim<h){
+      c.status='encerrada'; c.itens.forEach(i=>{if(['aprovado','suspenso_orcamento'].includes(i.status))i.status='encerrado'});
+      alerta('atencao','fim_camp_'+c.id,`Campanha "${c.nome}" encerrada — fim da vigência (${dbr(c.fim)}).`,c.id); dbSyncCamp(c); return;
+    }
+    if(cc>=c.orcamento){
+      if(c.status==='vigente'){
+        c.status='suspensa_orcamento';
+        c.itens.forEach(i=>{if(i.status==='aprovado')i.status='suspenso_orcamento'});
+        alerta('critico','estouro_camp_'+c.id,`Orçamento da campanha "${c.nome}" esgotado (${fmtR(cc)} de ${fmtR(c.orcamento)}). TODAS as promoções foram desfeitas — aumente o orçamento para reativar ou estanque a campanha.`,c.id);
+        ev(c,null,'suspensao','Orçamento da campanha esgotado — promoções desfeitas.');
+      }
+    } else if(cc>=S.pctAlerta*c.orcamento){
+      alerta('atencao','70_camp_'+c.id,`Campanha "${c.nome}" atingiu ${pct(cc/c.orcamento)} do orçamento (${fmtR(cc)} de ${fmtR(c.orcamento)}).`,c.id);
+    }
+    c.itens.forEach(it=>{
+      const per=itemPeriodo(c,it);
+      if(it.status==='aprovado'&&per.fim<h){
+        it.status='encerrado';
+        alerta('atencao','fim_item_'+it.id,`"${it.desc}" encerrado — fim da vigência do item (${dbr(per.fim)}).`,c.id,it.id); return;
+      }
+      if(!it.orcamento) return;
+      const ci=consumoItem(c,it).verba;
+      if(ci>=it.orcamento){
+        if(it.status==='aprovado'){
+          it.status='suspenso_orcamento';
+          alerta('critico','estouro_item_'+it.id,`Orçamento do item "${it.desc}" esgotado (${fmtR(ci)} de ${fmtR(it.orcamento)}) — promoção suspensa. Aumente o orçamento do item ou estanque a promoção dele.`,c.id,it.id);
+          ev(c,it,'suspensao','Orçamento do item esgotado.');
+        }
+      } else if(ci>=S.pctAlerta*it.orcamento){
+        alerta('atencao','70_item_'+it.id,`"${it.desc}" atingiu ${pct(ci/it.orcamento)} do orçamento do item (${fmtR(ci)} de ${fmtR(it.orcamento)}).`,c.id,it.id);
+      }
+    });
+    if(mudou()) dbSyncCamp(c);
+  });
+  save();
+}
+
+/* ---------------- apuração real (vendas_dia do VR) ---------------- */
+async function apurar(silencioso){
+  if(!ONLINE){ if(!silencioso) alert('Sem conexão — no modo demonstração use o botão de simular.'); return }
+  const ativos=S.campanhas.filter(c=>['vigente','suspensa_orcamento','encerrada','estancada'].includes(c.status));
+  const eans=[...new Set(ativos.flatMap(c=>c.itens.map(i=>i.ean)))];
+  if(!eans.length){ if(!silencioso) alert('Nenhum item aprovado para apurar.'); return }
+  const corte=ativos.reduce((a,c)=>c.inicio<a?c.inicio:a,'9999-12-31');
+  if(!silencioso) loading(true);
+  try{
+    let n=0;
+    for(let i=0;i<eans.length;i+=200){
+      const parte=eans.slice(i,i+200).map(e=>`"${e}"`).join(',');
+      const vd=await sbPag(`vendas_dia?select=ean,loja,data,qtd&ean=in.(${parte})&data=gte.${corte}`,'',40000);
+      vd.forEach(v=>{ S.vendas[`${v.ean}|${v.loja}|${String(v.data).slice(0,10)}`]=+v.qtd||0; n++ });
+    }
+    S.ultimaApuracao=new Date().toISOString();
+    save(); avaliar();
+    if(!silencioso){ render(); alert(`Apuração concluída: ${n} registros de venda lidos do VR.`) }
+  }catch(e){ if(!silencioso) alert('Falha na apuração: '+e.message); else console.warn('apuração:',e.message) }
+  finally{ if(!silencioso) loading(false) }
+}
+
+/* ---------------- componentes ---------------- */
+function meter(cons,orc,label){
+  const r=orc?cons/orc:0;
+  const cor=r>=1?'var(--crit)':r>=S.pctAlerta?'var(--warn)':'var(--good)';
+  const ic=r>=1?'⛔':r>=S.pctAlerta?'⚠️':'✅';
+  return `<div>
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--ink2);margin-bottom:4px">
+      <span>${label||''}</span><span>${ic} <b>${fmtR(cons)}</b> de ${fmtR(orc)} · ${orc?pct(Math.min(r,9.99)):'—'}</span></div>
+    <div class="meter"><i style="width:${Math.min(r,1)*100}%;background:${cor}"></i>
+      <span class="lim" style="left:${S.pctAlerta*100}%"></span></div>
+    <div class="small" style="margin-top:3px">Saldo: <b style="color:${orc-cons<0?'var(--crit)':'inherit'}">${fmtR(orc-cons)}</b></div></div>`;
+}
+
+/* =====================================================================  RENDER  */
+function abas(){
+  return ehGestor()
+   ? [['aprov','Aprovações'],['nova','Nova campanha'],['painel','Painel'],['alertas','Alertas'],
+      ['forn','Fornecedores'],['rep','Representantes'],['cad','Seções e parâmetros'],['sim','Apuração / VR']]
+   : [['minhas','Minhas campanhas'],
+      ...(minhasCamps().some(c=>c.status==='aguardando_fornecedor')?[['aprov','Propostas do Gestor']]:[]),
+      ['nova','Nova campanha'],['acomp','Acompanhamento'],['alertas','Alertas']];
+}
+function render(){
+  if(ONLINE&&!S.sessao) return telaLogin();
+  avaliar();
+  const pf=document.getElementById('perfil');
+  if(!S.perfil||!usuario()) S.perfil=(USERS.find(u=>u.papel==='gestor')||USERS[0]||{}).id;
+  if(ONLINE){                                   // logado: mostra quem é, sem troca de perfil
+    pf.style.display='none';
+    let sess=document.getElementById('sess');
+    if(!sess){ sess=el('<span id="sess" class="st"></span>'); pf.parentNode.insertBefore(sess,pf) }
+    sess.innerHTML=`${usuario()?.papel==='gestor'?'👤':'🏭'} ${usuario()?.nome||''}
+      <button class="b s o" style="margin-left:8px;padding:2px 8px;color:#fff;border-color:#fff6" onclick="recarregar()">↻</button>
+      <button class="b s o" style="margin-left:4px;padding:2px 8px;color:#fff;border-color:#fff6" onclick="sair()">sair</button>`;
+  } else {
+    pf.style.display='';
+    pf.innerHTML=USERS.filter(u=>['gestor','fornecedor'].includes(u.papel))
+      .map(u=>`<option value="${u.id}" ${String(u.id)===String(S.perfil)?'selected':''}>${u.papel==='gestor'?'👤 ':'🏭 '}${u.nome}</option>`).join('');
+  }
+  const A=abas(); if(!A.some(a=>a[0]===VIEW)) VIEW=A[0][0];
+  document.getElementById('nav').innerHTML=A.map(([k,t])=>`<button class="${k===VIEW?'on':''}" onclick="go('${k}')">${t}</button>`).join('')
+    +(naoLidos()?`<button onclick="go('alertas')" style="color:var(--crit);font-weight:700">● ${naoLidos()}</button>`:'');
+  const m=document.getElementById('app'); m.innerHTML='';
+  ({minhas:vMinhas,nova:vNova,acomp:vAcomp,alertas:vAlertas,aprov:vAprov,painel:vPainel,
+    forn:vForn,rep:vRep,cad:vCad,sim:vSim}[VIEW]||vMinhas)(m);
+}
+function go(v){ VIEW=v; render(); window.scrollTo(0,0) }
+function naoLidos(){ const f=fornDoUsuario();
+  return S.alertas.filter(a=>!a.lido&&(ehGestor()||camp(a.campId)?.fornKey===f)).length }
+const fornNome=k=>(FORN.find(f=>f.key===k)||{}).nome||k;
+const repNome=c=>(S.reps.find(r=>r.id===c.repId)||{}).nome||'';
+
+/* ---------------- fornecedor: minhas campanhas ---------------- */
+function vMinhas(m){
+  const cs=minhasCamps();
+  const pend=cs.filter(c=>c.status==='aguardando_fornecedor').length;
+  if(pend) m.appendChild(el(`<div class="card"><div class="alert i">📬 <b>${pend} proposta(s) do Gestor</b> esperando o seu aceite.
+    <div style="margin-top:6px"><button class="b s" onclick="go('aprov')">Analisar agora</button></div></div></div>`));
+  m.appendChild(el(`<div class="card"><h2>Minhas campanhas
+    <button class="b s o" style="float:right" onclick="recarregar()">↻ Atualizar</button></h2>
+    <p class="small">Os mostradores acompanham as vendas apuradas do VR e se atualizam sozinhos a cada minuto.</p>
+    ${cs.length?'':'<p class="small">Nenhuma campanha ainda.</p>'}
+    ${cs.map(c=>`<div class="itembox"><div class="hd">
+      <div><b>${c.nome}</b> ${statusTag(c.status)}
+        <div class="small">${c.itens.length} itens · ${dbr(c.inicio)} a ${dbr(c.fim)} · ${c.lojas.join(', ')}
+        · ${c.pagamento==='antecipado'?'💰 verba antecipada':'🧾 paga após a apuração'}${c.origem==='gestor'?' · criada pelo Gestor':''}</div></div>
+      <div style="display:flex;gap:6px">${c.status==='aguardando_fornecedor'?`<button class="b s g" onclick="go('aprov')">Analisar</button>`:''}
+        <button class="b s o" onclick="SEL='${c.id}';go('acomp')">Abrir</button></div></div>
+      <div style="margin-top:9px">${meter(consumoCamp(c).verba,c.orcamento,'Orçamento da campanha')}</div></div>`).join('')}
+  </div>`));
+}
+
+/* ---------------- wizard de campanha ---------------- */
+async function novoDraft(fk){
+  const f=fk||fornDoUsuario()||(FORN[0]||{}).key;
+  const h=hoje(); const d=new Date(h); d.setDate(d.getDate()+14);
+  DRAFT={id:uid(),fornKey:f,nome:'',inicio:h,fim:d.toISOString().slice(0,10),orcamento:2000,
+    pagamento:'pos',repId:(S.reps.find(r=>r.fornKey===f)||{}).id||'',
+    lojas:Object.keys(LOJAS),itens:[],status:'rascunho',eventos:[]};
+  if(f) await itensDoForn(f);
+}
+async function trocaForn(fk){ await novoDraft(fk); render() }
+function vNova(m){
+  const g=ehGestor();
+  if(!DRAFT||(!g&&DRAFT.fornKey!==fornDoUsuario())){ novoDraft().then(render);
+    m.appendChild(el('<div class="card"><p class="small">Carregando o portfólio…</p></div>')); return }
+  const d=DRAFT, disp=itensCache(d.fornKey), soma=d.itens.reduce((a,i)=>a+(+i.orcamento||0),0);
+  const reps=S.reps.filter(r=>r.fornKey===d.fornKey);
+
+  m.appendChild(el(`<div class="card"><h2>1 · Dados da campanha</h2>
+    ${g?`<div class="row" style="margin-bottom:10px">
+      <div style="flex:2 1 320px"><label>Fornecedor (razão social aglutinada)</label>
+        <select onchange="trocaForn(this.value)">${ordForn().map(f=>
+          `<option value="${f.key}" ${f.key===d.fornKey?'selected':''}>${S.principais.includes(f.key)?'★ ':''}${f.nome}${f.ids.length>1?` (${f.ids.length} CNPJs)`:''}</option>`).join('')}</select>
+        <div class="small" style="margin-top:4px">${disp.length} itens no portfólio · id_fornecedor: ${(FORN.find(f=>f.key===d.fornKey)||{ids:[]}).ids.join(', ')}</div></div>
+      <div><label>Representante</label><select onchange="DRAFT.repId=this.value">
+        <option value="">—</option>${reps.map(r=>`<option value="${r.id}" ${r.id===d.repId?'selected':''}>${r.nome}${r.cargo?' · '+r.cargo:''}</option>`).join('')}</select></div></div>`:''}
+    <div class="row">
+      <div style="flex:2 1 240px"><label>Nome da campanha</label><input id="nNome" value="${d.nome}" placeholder="Ex.: Encarte de Agosto"></div>
+      <div><label>Início (geral)</label><input type="date" id="nIni" value="${d.inicio}"></div>
+      <div><label>Fim (geral)</label><input type="date" id="nFim" value="${d.fim}"></div>
+      <div><label>Orçamento total (R$)</label><input type="number" step="0.01" id="nOrc" value="${d.orcamento}"></div>
+      <div style="flex:1 1 210px"><label>Pagamento da verba</label>
+        <select onchange="DRAFT.pagamento=this.value;render()">
+          <option value="pos" ${d.pagamento==='pos'?'selected':''}>Após a apuração</option>
+          <option value="antecipado" ${d.pagamento==='antecipado'?'selected':''}>Antecipado</option></select></div></div>
+    <div class="small" style="margin-top:6px">${d.pagamento==='antecipado'
+      ?'💰 O fornecedor credita o orçamento antes da campanha; o mostrador consome esse saldo já pago.'
+      :'🧾 A verba consumida vira cobrança ao fornecedor no fim da campanha.'}</div>
+    <h3>Lojas participantes</h3>
+    <div class="row" style="gap:6px">${Object.entries(LOJAS).map(([c,n])=>
+      `<span class="chip ${d.lojas.includes(c)?'on':''}" onclick="togLoja('${c}')">${c} ${n}</span>`).join('')}</div>
+  </div>`));
+
+  m.appendChild(el(`<div class="card"><h2>2 · Itens da campanha</h2>
+    <div class="row"><div style="flex:3 1 320px"><label>Escolher no portfólio do fornecedor</label>
+      <select id="nProd">${disp.filter(p=>!d.itens.some(i=>i.ean===p.ean)).slice(0,3000)
+        .map(p=>`<option value="${p.ean}">${p.desc} — ${p.ean}</option>`).join('')||'<option value="">(nenhum item disponível)</option>'}</select></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button class="b" onclick="addItem()">+ Adicionar</button></div></div>
+    <h3>Ou digitar / bipar o código de barras</h3>
+    <div class="row">
+      <div style="flex:2 1 260px"><label>EAN — um por linha, ou separados por vírgula/espaço</label>
+        <textarea id="nEan" rows="2" placeholder="7891000100103&#10;7896036090015" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();addPorEAN()}"></textarea></div>
+      <div style="flex:0 0 auto;align-self:flex-end;display:flex;gap:6px">
+        <button class="b" onclick="addPorEAN()">+ Adicionar por EAN</button>
+        <button class="b o" id="btScan" onclick="scanEAN()">📷 Bipar</button></div></div>
+    <div class="small" style="margin-top:4px">Só entram EANs da base de <b>${fornNome(d.fornKey)}</b> (id_fornecedor em produtos_loja). Item de outro fornecedor é recusado.</div>
+    <div id="eanMsg"></div>
+    <div id="itens" style="margin-top:12px">${d.itens.map(itemForm).join('')||'<p class="small">Nenhum item ainda.</p>'}</div>
+  </div>`));
+
+  m.appendChild(el(`<div class="card"><div class="kpi">
+      <div><span>Itens</span><b>${d.itens.length}</b></div>
+      <div><span>Orçamento da campanha</span><b>${fmtR(d.orcamento)}</b></div>
+      <div><span>Soma dos tetos por item</span><b style="color:${soma>(+d.orcamento||0)?'var(--warn)':'inherit'}">${fmtR(soma)}</b></div></div>
+    ${soma>(+d.orcamento||0)?`<div class="alert w">⚠️ A soma dos tetos por item supera o orçamento da campanha. O teto da campanha prevalece.</div>`:''}
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="b" onclick="enviar()" ${d.itens.length?'':'disabled'}>${g?'Enviar proposta ao fornecedor':'Enviar para aprovação do Gestor'}</button>
+      ${g?`<button class="b g" onclick="enviar(true)" ${d.itens.length?'':'disabled'}>Já acordado — colocar em vigência</button>`:''}
+      <button class="b o" onclick="novoDraft(DRAFT.fornKey).then(render)">Limpar</button></div></div>`));
+
+  ['nNome','nIni','nFim','nOrc'].forEach(id=>{const e=document.getElementById(id);
+    e.oninput=()=>{const k={nNome:'nome',nIni:'inicio',nFim:'fim',nOrc:'orcamento'}[id];
+      DRAFT[k]=id==='nOrc'?+e.value:e.value; if(id==='nOrc') render()}});
+  if(!('BarcodeDetector' in window)){const b=document.getElementById('btScan'); if(b){b.disabled=true;b.title='Precisa de HTTPS e navegador compatível'}}
+}
+function ordForn(){ return [...FORN].sort((a,b)=>
+  (S.principais.includes(b.key)?1:0)-(S.principais.includes(a.key)?1:0)||a.nome.localeCompare(b.nome)) }
+function togLoja(c){ const L=DRAFT.lojas, i=L.indexOf(c); i<0?L.push(c):L.splice(i,1);
+  DRAFT.itens.forEach(it=>{const p=achaEAN(DRAFT.fornKey,it.ean); if(p){const r=refs(p,L);
+    it.custoRef=r.custo; it.precoRef=r.preco; it.verbaSug=verbaSugerida(r.preco,it.preco); it.verba=it.verbaSug}});
+  render(); }
+
+function novoItemDe(p){
+  const r=refs(p,DRAFT.lojas);
+  const precoSug=+(r.preco*0.88).toFixed(2), vs=verbaSugerida(r.preco,precoSug);
+  return {id:uid(),ean:p.ean,desc:p.desc,secao:p.secao,preco:precoSug,verbaSug:vs,verba:vs,orcamento:200,
+    inicio:'',fim:'',custoRef:r.custo,precoRef:r.preco,precoMin:r.precoMin,precoMax:r.precoMax,
+    alvoRef:alvoSecao(p.secao),status:'aguardando_aceite'};
+}
+function addItem(){ const e=document.getElementById('nProd').value; if(!e) return;
+  const p=achaEAN(DRAFT.fornKey,e); if(p){DRAFT.itens.push(novoItemDe(p)); render()} }
+function addPorEAN(codigos){
+  const campo=document.getElementById('nEan');
+  const lista=[...new Set(String(codigos||(campo?campo.value:'')).split(/[\s,;]+/).map(soDig).filter(Boolean))];
+  if(!lista.length) return;
+  const ok=[],outro=[],nao=[],ja=[];
+  lista.forEach(e=>{
+    const p=achaEAN(DRAFT.fornKey,e);
+    if(p){ if(DRAFT.itens.some(i=>semZ(i.ean)===semZ(e))) ja.push(p); else {DRAFT.itens.push(novoItemDe(p)); ok.push(p)} return }
+    const alheio=achaEANqualquer(e);
+    alheio? outro.push({e,...alheio}) : nao.push(e);
+  });
+  const resto=[...outro.map(x=>x.e),...nao].join('\n');
+  save(); render();
+  const novo=document.getElementById('nEan'); if(novo) novo.value=resto;
+  const box=document.getElementById('eanMsg'); if(!box) return;
+  let h='';
+  if(ok.length)    h+=`<div class="alert i">✅ <b>${ok.length} item(ns) adicionado(s):</b> ${ok.map(x=>x.desc).join(', ')}</div>`;
+  if(ja.length)    h+=`<div class="alert w">⚠️ Já estavam na campanha: ${ja.map(x=>x.desc).join(', ')}</div>`;
+  if(outro.length) h+=`<div class="alert">🔴 <b>Não é da base deste fornecedor:</b> ${outro.map(x=>`${x.e} — ${x.p.desc} (${fornNome(x.fk)})`).join('; ')}</div>`;
+  if(nao.length)   h+=`<div class="alert">🔴 <b>EAN não encontrado no portfólio carregado:</b> ${nao.join(', ')}</div>`;
+  box.innerHTML=h;
+}
+async function scanEAN(){
+  if(!('BarcodeDetector' in window)) return alert('Este navegador não tem leitor de código de barras.');
+  try{
+    const det=new BarcodeDetector({formats:['ean_13','ean_8','upc_a','code_128']});
+    const st=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});
+    const v=document.createElement('video'); v.srcObject=st; v.setAttribute('playsinline',''); await v.play();
+    const dlg=document.getElementById('dlg'), inn=document.getElementById('dlgIn');
+    inn.innerHTML='<h2>Aponte para o código de barras</h2>'; v.style.width='100%'; inn.appendChild(v);
+    const bt=el('<button class="b o" style="margin-top:10px">Fechar</button>'); inn.appendChild(bt); dlg.showModal();
+    const parar=()=>{st.getTracks().forEach(t=>t.stop()); dlg.close()}; bt.onclick=parar;
+    const loop=async()=>{ if(!dlg.open) return;
+      try{const r=await det.detect(v); if(r.length){parar(); addPorEAN(r[0].rawValue); return}}catch(e){}
+      requestAnimationFrame(loop)}; loop();
+  }catch(e){ alert('Não consegui abrir a câmera: '+e.message) }
+}
+function itemForm(it){
+  const pv=+it.preco||0, vb=+it.verba||0, alvo=alvoSecao(it.secao);
+  const vs=verbaSugerida(it.precoRef,pv);
+  const mg=margemCom(pv,it.custoRef,vb), mgRS=margemRS(pv,it.custoRef,vb);
+  const mgHoje=it.precoRef-it.custoRef;
+  const menos=vb<vs-0.0001, abaixo=mg<alvo-0.0001;
+  const varia=it.precoMax&&it.precoMin&&it.precoMax-it.precoMin>0.001;
+  return `<div class="itembox ${menos?'bad':''}">
+    <div class="hd"><div><b>${it.desc}</b>
+      <div class="small">${it.ean} · ${it.secao} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)}${varia?` <span title="preços diferentes entre as lojas">(varia ${fmt(it.precoMin)}–${fmt(it.precoMax)})</span>`:''}</div></div>
+      <button class="b s o" onclick="delItem('${it.id}')">remover</button></div>
+    <div class="row" style="margin-top:9px">
+      <div><label>Preço de venda sugerido</label><input type="number" step="0.01" value="${it.preco}" oninput="setIt('${it.id}','preco',this.value)"></div>
+      <div><label title="Preço cheio − preço sugerido">Verba sugerida (R$)</label><input value="${fmt(vs)}" disabled></div>
+      <div><label>Verba unitária ofertada</label><div style="display:flex;gap:5px">
+        <button class="b s o" onclick="stepVerba('${it.id}',-0.05)">−</button>
+        <input type="number" step="0.01" value="${it.verba}" oninput="setIt('${it.id}','verba',this.value)">
+        <button class="b s o" onclick="stepVerba('${it.id}',0.05)">+</button></div></div>
+      <div><label>Orçamento deste item (R$)</label><input type="number" step="0.01" value="${it.orcamento||''}" placeholder="sem teto próprio" oninput="setIt('${it.id}','orcamento',this.value)"></div>
+      <div><label>Início do item</label><input type="date" value="${it.inicio||''}" oninput="setIt('${it.id}','inicio',this.value)"></div>
+      <div><label>Fim do item</label><input type="date" value="${it.fim||''}" oninput="setIt('${it.id}','fim',this.value)"></div></div>
+    <div class="small" style="margin-top:6px">Desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'} ·
+      Margem hoje <b>${fmtR(mgHoje)}</b> → com a verba <b style="color:${mgRS<mgHoje-0.0001?'var(--crit)':'var(--good)'}">${fmtR(mgRS)}</b> (${pct(mg)}) por unidade</div>
+    ${menos?`<div class="alert">🔴 <b>Verba abaixo da sugerida.</b> Com ${fmtR(vb)} (sugerido ${fmtR(vs)}) a margem cai de ${fmtR(mgHoje)} para <b>${fmtR(mgRS)}</b> (${pct(mg)}) — perda de ${fmtR(vs-vb)} por unidade vendida.</div>`:''}
+    ${(!menos&&abaixo)?`<div class="alert w">⚠️ Mesmo com a verba cheia a margem fica em ${pct(mg)}, abaixo do alvo de ${pct(alvo)} da seção ${it.secao}.</div>`:''}</div>`;
+}
+function setIt(id,k,v){
+  const it=DRAFT.itens.find(i=>i.id===id); if(!it) return;
+  it[k]=(k==='inicio'||k==='fim')?v:(v===''?'':+v);
+  if(k==='preco'){ it.verbaSug=verbaSugerida(it.precoRef,+v||0); it.verba=it.verbaSug }
+  document.getElementById('itens').innerHTML=DRAFT.itens.map(itemForm).join('');
+}
+function stepVerba(id,d){ const it=DRAFT.itens.find(i=>i.id===id);
+  it.verba=Math.max(0,+((+it.verba||0)+d).toFixed(2));
+  document.getElementById('itens').innerHTML=DRAFT.itens.map(itemForm).join(''); }
+function delItem(id){ DRAFT.itens=DRAFT.itens.filter(i=>i.id!==id); render() }
+async function enviar(jaAcordada){
+  const d=DRAFT, g=ehGestor();
+  if(!d.nome) return alert('Dê um nome à campanha.');
+  if(!d.lojas.length) return alert('Escolha ao menos uma loja.');
+  if(d.fim<d.inicio) return alert('Período geral inválido.');
+  d.origem=g?'gestor':'fornecedor';
+  d.status=g?(jaAcordada?'vigente':'aguardando_fornecedor'):'aguardando_aceite';
+  d.criadaEm=new Date().toISOString();
+  d.itens.forEach(i=>{i.status=(g&&jaAcordada)?'aprovado':(g?'aguardando_fornecedor':'aguardando_aceite'); i.orcamento=+i.orcamento||0});
+  const msg=`${g?'Campanha criada pelo Gestor':'Proposta do fornecedor'}: ${d.itens.length} itens, orçamento ${fmtR(d.orcamento)}, pagamento ${d.pagamento==='antecipado'?'antecipado':'após apuração'}.`;
+  const c=JSON.parse(JSON.stringify(d)); c.eventos=[{id:uid(),data:c.criadaEm,tipo:'proposta',autor:usuario()?.nome,msg}];
+  if(DB){
+    loading(true);
+    try{ await dbNovaCampanha(c); await dbCarregar(); }
+    catch(e){ loading(false); return alert('Não consegui gravar no banco: '+e.message) }
+    loading(false);
+    alert(g?(jaAcordada?'Campanha em vigência. O fornecedor já vê no portal dele.'
+                       :'Proposta enviada — o fornecedor recebe no portal e dá o aceite de onde estiver.')
+           :'Proposta enviada ao Gestor.');
+  } else {
+    S.campanhas.unshift(c); save();
+    alert('Gravado só neste navegador — rode o schema_campanhas.sql para o fornecedor enxergar à distância.');
+  }
+  if(g&&!jaAcordada) alerta('atencao','prop_gestor_'+(S.campanhas[0]||{}).id,`O Gestor propôs a campanha "${c.nome}".`,(S.campanhas[0]||{}).id);
+  novoDraft(d.fornKey).then(()=>go(g?'painel':'minhas'));
+}
+
+/* ---------------- acompanhamento / painel ---------------- */
+function vAcomp(m){
+  const cs=minhasCamps().filter(c=>c.status!=='rascunho');
+  if(!cs.length) return m.appendChild(el('<div class="card"><p class="small">Nenhuma campanha enviada.</p></div>'));
+  const c=cs.find(x=>x.id===SEL)||cs[0]; SEL=c.id;
+  m.appendChild(el(`<div class="card"><label>Campanha</label><select onchange="SEL=this.value;render()">
+    ${cs.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${x.nome} — ${x.status}</option>`).join('')}</select></div>`));
+  painelCampanha(m,c);
+}
+function vPainel(m){
+  const cs=S.campanhas.filter(c=>c.status!=='rascunho');
+  if(!cs.length) return m.appendChild(el('<div class="card"><p class="small">Sem campanhas.</p></div>'));
+  const cons=cs.reduce((a,c)=>a+consumoCamp(c).verba,0);
+  m.appendChild(el(`<div class="card"><h2>Visão geral</h2><div class="kpi">
+    <div><span>Campanhas vigentes</span><b>${cs.filter(c=>c.status==='vigente').length}</b></div>
+    <div><span>Itens em promoção</span><b>${cs.reduce((a,c)=>a+c.itens.filter(i=>i.status==='aprovado').length,0)}</b></div>
+    <div><span>Verba contratada</span><b>${fmtR(cs.reduce((a,c)=>a+c.orcamento,0))}</b></div>
+    <div><span>Verba consumida</span><b>${fmtR(cons)}</b></div>
+    <div><span>Antecipada (já paga)</span><b>${fmtR(cs.filter(c=>c.pagamento==='antecipado').reduce((a,c)=>a+c.orcamento,0))}</b></div>
+    <div><span>A faturar (pós-apuração)</span><b>${fmtR(cs.filter(c=>c.pagamento!=='antecipado').reduce((a,c)=>a+consumoCamp(c).verba,0))}</b></div>
+    </div>${S.ultimaApuracao?`<div class="small" style="margin-top:8px">Última apuração: ${dbr(S.ultimaApuracao)} ${S.ultimaApuracao.slice(11,16)}</div>`:''}</div>`));
+  const c=cs.find(x=>x.id===SEL)||cs[0]; SEL=c.id;
+  m.appendChild(el(`<div class="card"><label>Campanha</label><select onchange="SEL=this.value;render()">
+    ${cs.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${fornNome(x.fornKey)} — ${x.nome} (${x.status})</option>`).join('')}</select></div>`));
+  painelCampanha(m,c);
+}
+function painelCampanha(m,c){
+  const cc=consumoCamp(c), saldo=c.orcamento-cc.verba;
+  m.appendChild(el(`<div class="card">
+    <div class="hd"><div><h2 style="margin:0">${c.nome} ${statusTag(c.status)}</h2>
+      <div class="small">${fornNome(c.fornKey)}${repNome(c)?' · rep. '+repNome(c):''} · ${dbr(c.inicio)} a ${dbr(c.fim)} · ${c.lojas.join(', ')} · criada ${c.origem==='gestor'?'pelo Gestor':'pelo fornecedor'}</div></div>
+      <span class="tag ${c.pagamento==='antecipado'?'ok':'wait'}">${c.pagamento==='antecipado'?'💰 Verba antecipada':'🧾 Paga após a apuração'}</span></div>
+    <div style="margin:12px 0">${meter(cc.verba,c.orcamento,'Mostrador — verba consumida na campanha')}</div>
+    <div class="kpi">
+      <div><span>Itens aprovados</span><b>${c.itens.filter(i=>i.status==='aprovado').length}/${c.itens.length}</b></div>
+      <div><span>Unidades vendidas</span><b>${fmt(cc.un)}</b></div>
+      <div><span>Verba consumida</span><b>${fmtR(cc.verba)}</b></div>
+      <div><span>${c.pagamento==='antecipado'?'Saldo do adiantamento':'Saldo do teto'}</span>
+        <b style="color:${saldo<=0?'var(--crit)':saldo<c.orcamento*(1-S.pctAlerta)?'var(--warn)':'var(--good)'}">${fmtR(saldo)}</b></div></div>
+    ${c.status==='suspensa_orcamento'?`<div class="alert">⛔ <b>Orçamento da campanha esgotado.</b> Todas as promoções foram desfeitas.
+      <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="b" onclick="aumentar('${c.id}',null)">Aumentar o orçamento e reativar</button>
+        <button class="b d" onclick="estancar('${c.id}',null)">Estancar a campanha</button></div></div>`:''}
+    ${c.status==='vigente'?`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="b o s" onclick="aumentar('${c.id}',null)">Aumentar orçamento</button>
+      <button class="b o s" onclick="estancar('${c.id}',null)">Estancar campanha</button></div>`:''}</div>`));
+
+  m.appendChild(el(`<div class="card"><h2>Itens</h2><div class="tw"><table>
+    <tr><th>Item</th><th class="n">Preço</th><th class="n">Verba un.</th><th class="n">Margem un.</th><th>Vigência</th>
+        <th style="min-width:180px">Orçamento do item</th><th class="n">Un.</th><th>Status</th><th></th></tr>
+    ${c.itens.map(it=>{
+      const x=consumoItem(c,it), r=it.orcamento?x.verba/it.orcamento:0, per=itemPeriodo(c,it);
+      const mgRS=margemRS(it.preco,it.custoRef,it.verba), mgH=it.precoRef-it.custoRef;
+      const cor=r>=1?'var(--crit)':r>=S.pctAlerta?'var(--warn)':'var(--good)';
+      return `<tr><td><b>${it.desc}</b><div class="small">${it.ean} · ${it.secao}</div></td>
+        <td class="n">${fmt(it.preco)}<div class="small">de ${fmt(it.precoRef)}</div></td>
+        <td class="n">${fmt(it.verba)}${it.verba<it.verbaSug-.001?`<div class="small" style="color:var(--crit)">↓ sug. ${fmt(it.verbaSug)}</div>`:''}</td>
+        <td class="n" style="color:${mgRS<mgH-.001?'var(--crit)':'inherit'}">${fmt(mgRS)}<div class="small">hoje ${fmt(mgH)}</div></td>
+        <td class="small">${dbr(per.ini)}<br>a ${dbr(per.fim)}</td>
+        <td>${it.orcamento?`<div class="meter"><i style="width:${Math.min(r,1)*100}%;background:${cor}"></i>
+            <span class="lim" style="left:${S.pctAlerta*100}%"></span></div>
+            <div class="small">${fmtR(x.verba)} de ${fmtR(it.orcamento)}</div>`:'<span class="small">sem teto próprio</span>'}</td>
+        <td class="n">${fmt(x.un)}</td><td>${statusTag(it.status)}</td>
+        <td style="white-space:nowrap">${it.status==='suspenso_orcamento'
+          ?`<button class="b s" onclick="aumentar('${c.id}','${it.id}')">Aumentar</button> <button class="b s d" onclick="estancar('${c.id}','${it.id}')">Estancar</button>`
+          :it.status==='aprovado'?`<button class="b s o" onclick="aumentar('${c.id}','${it.id}')">+ orçam.</button> <button class="b s o" onclick="estancar('${c.id}','${it.id}')">Estancar</button>`:''}</td></tr>`}).join('')}
+  </table></div></div>`));
+
+  if(c.eventos?.length) m.appendChild(el(`<div class="card"><h2>Histórico</h2>
+    ${c.eventos.slice(0,25).map(e=>`<div class="hist"><b>${dbr(e.data)}</b> · ${e.tipo}${e.item?' · '+e.item:''} — ${e.msg} <span class="small">(${e.autor||''})</span></div>`).join('')}</div>`));
+}
+function aumentar(cid,iid){
+  const c=camp(cid), it=iid?c.itens.find(i=>i.id===iid):null;
+  const atual=it?it.orcamento:c.orcamento;
+  const v=prompt(`Novo orçamento ${it?'do item "'+it.desc+'"':'da campanha'} (atual ${fmtR(atual)}):`,atual);
+  if(v===null) return; const n=+String(v).replace(',','.');
+  if(!(n>atual)) return alert('O novo orçamento precisa ser maior que o atual.');
+  if(it){ it.orcamento=n; if(it.status==='suspenso_orcamento') it.status='aprovado';
+    S.alertas=S.alertas.filter(a=>!(a.itemId===it.id&&/estouro_item|70_item/.test(a.tipo)));
+    ev(c,it,'aumento_orcamento',`Orçamento do item de ${fmtR(atual)} para ${fmtR(n)} — promoção reativada.`);
+  } else { c.orcamento=n;
+    S.alertas=S.alertas.filter(a=>!(a.campId===c.id&&!a.itemId&&/estouro_camp|70_camp/.test(a.tipo)));
+    if(c.status==='suspensa_orcamento'){ c.status='vigente';
+      c.itens.forEach(i=>{if(i.status==='suspenso_orcamento'&&(!i.orcamento||consumoItem(c,i).verba<i.orcamento)) i.status='aprovado'}) }
+    ev(c,null,'aumento_orcamento',`Orçamento da campanha de ${fmtR(atual)} para ${fmtR(n)} — promoções reativadas.`);
+  }
+  save(); dbSyncCamp(c); render();
+}
+function estancar(cid,iid){
+  const c=camp(cid), it=iid?c.itens.find(i=>i.id===iid):null;
+  if(!confirm(it?`Estancar a promoção de "${it.desc}"?`:`Estancar a campanha "${c.nome}"? Todas as promoções serão desfeitas.`)) return;
+  if(it){ it.status='estancado'; ev(c,it,'estancar','Promoção do item estancada.') }
+  else { c.status='estancada'; c.itens.forEach(i=>{if(['aprovado','suspenso_orcamento'].includes(i.status))i.status='estancado'});
+         ev(c,null,'estancar','Campanha estancada.') }
+  save(); dbSyncCamp(c); render();
+}
+
+/* ---------------- aprovações ---------------- */
+const stPend=()=>ehGestor()?'aguardando_aceite':'aguardando_fornecedor';
+function vAprov(m){
+  const cs=minhasCamps().filter(c=>c.status===stPend()||c.itens.some(i=>i.status===stPend()));
+  if(!cs.length) return m.appendChild(el('<div class="card"><p class="small">Nada aguardando aceite. ✅</p></div>'));
+  cs.forEach(c=>{
+    m.appendChild(el(`<div class="card">
+      <div class="hd"><div><h2 style="margin:0">${c.nome} ${statusTag(c.status)}</h2>
+        <div class="small">${fornNome(c.fornKey)} · ${c.origem==='gestor'?'criada pelo Gestor':'proposta do fornecedor'} em ${dbr(c.criadaEm)}
+        · pagamento <b>${c.pagamento==='antecipado'?'antecipado':'após a apuração'}</b>${repNome(c)?' · rep. '+repNome(c):''}</div></div></div>
+      <h3>Condições gerais (podem ser alteradas antes do aceite)</h3>
+      <div class="row">
+        <div><label>Início</label><input type="date" id="g_i_${c.id}" value="${c.inicio}"></div>
+        <div><label>Fim</label><input type="date" id="g_f_${c.id}" value="${c.fim}"></div>
+        <div><label>Orçamento total (R$)</label><input type="number" step="0.01" id="g_o_${c.id}" value="${c.orcamento}"></div>
+        <div style="flex:1 1 200px"><label>Pagamento</label><select onchange="camp('${c.id}').pagamento=this.value;save();render()">
+          <option value="pos" ${c.pagamento!=='antecipado'?'selected':''}>Após a apuração</option>
+          <option value="antecipado" ${c.pagamento==='antecipado'?'selected':''}>Antecipado</option></select></div></div>
+      <div class="row" style="gap:6px;margin-top:8px">${Object.keys(LOJAS).map(l=>
+        `<span class="chip ${c.lojas.includes(l)?'on':''}" onclick="togLojaC('${c.id}','${l}')">${l}</span>`).join('')}</div>
+      <h3>Itens propostos</h3><div id="apr_${c.id}"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="b g" onclick="decidirTudo('${c.id}',true)">Aceitar todos os itens pendentes</button>
+        <button class="b d" onclick="decidirTudo('${c.id}',false)">Recusar campanha</button></div></div>`));
+    document.getElementById('apr_'+c.id).innerHTML=c.itens.map(it=>aprovForm(c,it)).join('');
+  });
+}
+function togLojaC(cid,l){ const c=camp(cid), i=c.lojas.indexOf(l); i<0?c.lojas.push(l):c.lojas.splice(i,1); save(); dbSyncCamp(c); render() }
+function aprovForm(c,it){
+  const pv=+it.preco||0, vb=+it.verba||0, alvo=alvoSecao(it.secao);
+  const vs=verbaSugerida(it.precoRef,pv);
+  const mg=margemCom(pv,it.custoRef,vb), mgRS=margemRS(pv,it.custoRef,vb), mgH=it.precoRef-it.custoRef;
+  const menos=vb<vs-0.0001, pend=it.status===stPend();
+  return `<div class="itembox ${menos?'bad':''}">
+    <div class="hd"><div><b>${it.desc}</b> ${statusTag(it.status)}
+      <div class="small">${it.ean} · ${it.secao} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)} · desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'}</div></div></div>
+    <div class="row" style="margin-top:8px">
+      <div><label>Preço promocional</label><input type="number" step="0.01" id="a_p_${it.id}" value="${it.preco}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
+      <div><label>Verba sugerida</label><input value="${fmt(vs)}" disabled></div>
+      <div><label>Verba unitária</label><input type="number" step="0.01" id="a_v_${it.id}" value="${it.verba}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
+      <div><label>Orçamento do item</label><input type="number" step="0.01" id="a_o_${it.id}" value="${it.orcamento||''}" ${pend?'':'disabled'}></div>
+      <div><label>Início do item</label><input type="date" id="a_i_${it.id}" value="${it.inicio||''}" ${pend?'':'disabled'}></div>
+      <div><label>Fim do item</label><input type="date" id="a_f_${it.id}" value="${it.fim||''}" ${pend?'':'disabled'}></div></div>
+    <div class="small" style="margin-top:6px">Margem hoje <b>${fmtR(mgH)}</b> → com a verba
+      <b style="color:${mgRS<mgH-.001?'var(--crit)':'var(--good)'}">${fmtR(mgRS)}</b> (${pct(mg)})
+      · o teto do item paga ${it.orcamento&&vb?fmt(it.orcamento/vb)+' un.':'—'}</div>
+    ${menos?`<div class="alert">🔴 Verba ${fmtR(vb)} abaixo da sugerida ${fmtR(vs)} — margem unitária cai de ${fmtR(mgH)} para ${fmtR(mgRS)}.</div>`:''}
+    ${pend?`<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="b g s" onclick="decidir('${c.id}','${it.id}',true)">Aceitar item</button>
+      <button class="b d s" onclick="decidir('${c.id}','${it.id}',false)">Recusar item</button>
+      <button class="b o s" onclick="contra('${c.id}','${it.id}')">Salvar alteração (contraproposta)</button></div>`:''}</div>`;
+}
+function reAprov(cid,iid){
+  const c=camp(cid), it=c.itens.find(i=>i.id===iid);
+  it.preco=+document.getElementById('a_p_'+iid).value; it.verba=+document.getElementById('a_v_'+iid).value;
+  const act=document.activeElement?.id;
+  document.getElementById('apr_'+cid).innerHTML=c.itens.map(x=>aprovForm(c,x)).join('');
+  if(act){const e=document.getElementById(act); if(e){e.focus(); e.setSelectionRange?.(e.value.length,e.value.length)}}
+}
+function lerAprov(c,it){
+  const g=p=>document.getElementById(p+it.id);
+  const de={preco:it.preco,verba:it.verba,orcamento:it.orcamento,inicio:it.inicio,fim:it.fim};
+  if(g('a_p_')){ it.preco=+g('a_p_').value; it.verba=+g('a_v_').value; it.orcamento=+g('a_o_').value||0;
+                 it.inicio=g('a_i_').value||''; it.fim=g('a_f_').value||''; }
+  it.verbaSug=verbaSugerida(it.precoRef,it.preco);
+  return Object.keys(de).filter(k=>String(de[k]||'')!==String(it[k]||'')).map(k=>`${k}: ${de[k]||'—'} → ${it[k]||'—'}`).join('; ');
+}
+function lerGeral(c){ const g=p=>document.getElementById(p+c.id);
+  if(g('g_i_')){ c.inicio=g('g_i_').value||c.inicio; c.fim=g('g_f_').value||c.fim;
+                 c.orcamento=+g('g_o_').value||c.orcamento } }
+function contra(cid,iid){ const c=camp(cid), it=c.itens.find(i=>i.id===iid);
+  lerGeral(c); const dif=lerAprov(c,it); ev(c,it,'alteracao_gestor',dif||'sem alterações');
+  save(); dbSyncCamp(c); render(); alert('Alteração salva. O item continua aguardando aceite.'); }
+function decidir(cid,iid,ok){
+  const c=camp(cid), it=c.itens.find(i=>i.id===iid);
+  lerGeral(c); const dif=lerAprov(c,it);
+  it.status=ok?'aprovado':'recusado';
+  ev(c,it,ok?'aceite':'recusa',(dif?`alterado (${dif}); `:'')+(ok?`aceito a ${fmtR(it.preco)} com verba de ${fmtR(it.verba)}/un.`:'recusado'));
+  if(c.itens.some(i=>i.status==='aprovado')&&['aguardando_aceite','aguardando_fornecedor'].includes(c.status)) c.status='vigente';
+  if(c.itens.every(i=>i.status==='recusado')) c.status='recusada';
+  save(); dbSyncCamp(c); render();
+}
+function decidirTudo(cid,ok){
+  const c=camp(cid); lerGeral(c);
+  if(!ok&&!confirm('Recusar toda a campanha?')) return;
+  c.itens.filter(i=>i.status===stPend()).forEach(it=>{lerAprov(c,it); it.status=ok?'aprovado':'recusado'});
+  c.status=ok?'vigente':'recusada';
+  ev(c,null,ok?'aceite':'recusa',(ok?'Campanha aceita ':'Campanha recusada ')+(ehGestor()?'pelo Gestor':'pelo Fornecedor')+'.');
+  save(); dbSyncCamp(c); render();
+}
+
+/* ---------------- alertas ---------------- */
+function vAlertas(m){
+  const f=fornDoUsuario();
+  const as=S.alertas.filter(a=>ehGestor()||camp(a.campId)?.fornKey===f);
+  m.appendChild(el(`<div class="card"><h2>Alertas</h2>${as.length?'':'<p class="small">Sem alertas.</p>'}
+    ${as.map(a=>`<div class="alert ${a.nivel==='critico'?'':'w'}">${a.nivel==='critico'?'⛔':'⚠️'}
+      <b>${a.nivel==='critico'?'Crítico':'Atenção'}</b> · ${dbr(a.data)}<div>${a.msg}</div>
+      <div style="margin-top:6px"><button class="b s o" onclick="SEL='${a.campId}';go('${ehGestor()?'painel':'acomp'}')">Ver campanha</button>
+      <button class="b s o" onclick="S.alertas.find(x=>x.id==='${a.id}').lido=true;save();render()">Marcar lido</button></div></div>`).join('')}
+    ${as.length?'<button class="b o s" onclick="S.alertas.forEach(a=>a.lido=true);save();render()">Marcar todos como lidos</button>':''}</div>`));
+}
+
+/* ---------------- fornecedores ---------------- */
+function vForn(m){
+  const busca=(S.buscaForn||'').toUpperCase();
+  const lista=ordForn().filter(f=>!busca||f.nome.toUpperCase().includes(busca)).slice(0,400);
+  m.appendChild(el(`<div class="card"><h2>Fornecedores <span class="small">(${FORN.length} razões sociais${ONLINE?' vindas do VR':' — demonstração'})</span></h2>
+    <p class="small">Aglutinados pela razão social: uma linha por empresa, somando todos os id_fornecedor (CNPJs) — mesma regra do relatório mensal do Data Crítica. Marque os <b>principais</b> para eles subirem no topo.</p>
+    <div class="row"><div style="flex:2 1 260px"><label>Buscar</label>
+      <input value="${S.buscaForn||''}" oninput="S.buscaForn=this.value;save();render()" placeholder="parte da razão social"></div></div>
+    <div class="tw" style="margin-top:10px"><table>
+      <tr><th>Principal</th><th>Razão social</th><th class="n">CNPJs</th><th>Representantes</th><th class="n">Campanhas</th><th class="n">Consumido</th><th></th></tr>
+      ${lista.map(f=>{
+        const cs=S.campanhas.filter(c=>c.fornKey===f.key);
+        const reps=S.reps.filter(r=>r.fornKey===f.key);
+        return `<tr>
+          <td><input type="checkbox" ${S.principais.includes(f.key)?'checked':''} onchange="togPrincipal('${f.key.replace(/'/g,"\\'")}')"></td>
+          <td><b>${f.nome}</b><div class="small">ids: ${f.ids.join(', ')}</div></td>
+          <td class="n">${f.ids.length}</td>
+          <td class="small">${reps.map(r=>r.nome).join('<br>')||'—'}</td>
+          <td class="n">${cs.length}</td>
+          <td class="n">${fmtR(cs.reduce((a,c)=>a+consumoCamp(c).verba,0))}</td>
+          <td><button class="b s o" onclick="novoDraft('${f.key.replace(/'/g,"\\'")}').then(()=>go('nova'))">Criar campanha</button></td></tr>`}).join('')}
+    </table></div>
+    ${lista.length>=400?'<p class="small">Mostrando os 400 primeiros — use a busca.</p>':''}</div>`));
+}
+function togPrincipal(k){ const i=S.principais.indexOf(k); i<0?S.principais.push(k):S.principais.splice(i,1); save(); render() }
+
+/* ---------------- representantes ---------------- */
+function vRep(m){
+  m.appendChild(el(`<div class="card"><h2>Representantes dos fornecedores</h2>
+    <p class="small">Quem negocia a campanha. O marcado recebe os alertas de 70% e de estouro.</p>
+    <div class="tw"><table>
+      <tr><th>Fornecedor</th><th>Nome</th><th>Cargo</th><th>E-mail</th><th>Telefone</th><th>Alertas</th><th></th></tr>
+      ${S.reps.map(r=>`<tr><td class="small">${fornNome(r.fornKey)}</td>
+        <td><input value="${r.nome}" onchange="setRep('${r.id}','nome',this.value)"></td>
+        <td><input value="${r.cargo||''}" onchange="setRep('${r.id}','cargo',this.value)"></td>
+        <td><input value="${r.email||''}" onchange="setRep('${r.id}','email',this.value)"></td>
+        <td><input value="${r.tel||''}" onchange="setRep('${r.id}','tel',this.value)"></td>
+        <td style="text-align:center"><input type="checkbox" ${r.alerta?'checked':''} onchange="setRep('${r.id}','alerta',this.checked)"></td>
+        <td><button class="b s o" onclick="delRep('${r.id}')">excluir</button></td></tr>`).join('')
+        ||'<tr><td colspan="7" class="small">Nenhum representante cadastrado.</td></tr>'}</table></div>
+    <h3>Adicionar</h3>
+    <div class="row">
+      <div style="flex:2 1 240px"><label>Fornecedor</label><select id="rForn">${ordForn().slice(0,400).map(f=>
+        `<option value="${f.key}">${S.principais.includes(f.key)?'★ ':''}${f.nome}</option>`).join('')}</select></div>
+      <div><label>Nome</label><input id="rNome"></div>
+      <div><label>Cargo</label><input id="rCargo" placeholder="Representante, supervisor, KAM..."></div>
+      <div><label>E-mail</label><input id="rEmail" type="email"></div>
+      <div><label>Telefone</label><input id="rTel"></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button class="b" onclick="addRep()">+ Adicionar</button></div></div></div>`));
+}
+function setRep(id,k,v){ const r=S.reps.find(x=>x.id===id); r[k]=v; save() }
+function delRep(id){ if(confirm('Excluir representante?')){ S.reps=S.reps.filter(r=>r.id!==id); save(); render() } }
+function addRep(){ const g=i=>document.getElementById(i).value.trim();
+  if(!g('rNome')) return alert('Informe o nome.');
+  S.reps.push({id:uid(),fornKey:g('rForn'),nome:g('rNome'),cargo:g('rCargo'),email:g('rEmail'),tel:g('rTel'),alerta:true});
+  save(); render(); }
+
+/* ---------------- seções e parâmetros ---------------- */
+function vCad(m){
+  const secoes=[...new Set([...Object.keys(S.secoes),...Object.values(CACHE.itens).flat().map(p=>p.secao)])].sort();
+  m.appendChild(el(`<div class="card"><h2>Margem-alvo por seção</h2>
+    <p class="small">A verba sugerida é <b>preço cheio − preço sugerido</b> (mantém a margem em R$). A margem-alvo abaixo é o <b>piso de referência</b>: se a margem ficar abaixo dela mesmo com a verba cheia, o app avisa. As seções vêm de <code>produtos.secao</code>.</p>
+    <div class="tw"><table><tr><th>Seção</th><th class="n">Margem-alvo</th></tr>
+      ${secoes.map(s=>`<tr><td>${s}</td><td class="n"><input type="number" step="0.5" style="width:90px;text-align:right"
+        value="${(alvoSecao(s)*100).toFixed(1)}" onchange="S.secoes['${s.replace(/'/g,"\\'")}']=+this.value/100;save()"> %</td></tr>`).join('')
+        ||'<tr><td colspan="2" class="small">Carregue o portfólio de um fornecedor para as seções aparecerem.</td></tr>'}</table></div></div>`));
+  m.appendChild(el(`<div class="card"><h2>Parâmetros</h2>
+    <div class="row"><div><label>Alerta de consumo em (%)</label>
+      <input type="number" step="1" value="${(S.pctAlerta*100).toFixed(0)}" onchange="S.pctAlerta=+this.value/100;save();render()"></div>
+      <div style="flex:2 1 300px"><label>Supabase (mesmo projeto do Data Crítica)</label><input value="${CFG.url}" disabled></div></div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="b o s" onclick="conectar().then(render)">Recarregar cadastro do VR</button>
+      <button class="b o s" onclick="if(confirm('Apagar campanhas, alertas e apuração deste navegador?')){localStorage.removeItem(LS);load();render()}">Zerar dados locais</button></div></div>`));
+}
+
+/* ---------------- apuração ---------------- */
+function vSim(m){
+  const vig=S.campanhas.filter(c=>c.status==='vigente').flatMap(c=>c.itens.filter(i=>itemVigente(c,i)));
+  m.appendChild(el(`<div class="card"><h2>Apuração da verba</h2>
+    <p class="small">A verba consumida = unidades vendidas × verba unitária, lendo <code>vendas_dia</code> (ean, loja, data, qtd) —
+    a mesma tabela que o sync do VR alimenta para o Data Crítica. Só contam as lojas e o período de cada item.</p>
+    <div class="kpi">
+      <div><span>Itens em promoção agora</span><b>${vig.length}</b></div>
+      <div><span>Última apuração</span><b style="font-size:15px">${S.ultimaApuracao?dbr(S.ultimaApuracao)+' '+S.ultimaApuracao.slice(11,16):'—'}</b></div>
+      <div><span>Conexão</span><b style="font-size:15px">${ONLINE?'Supabase OK':'demonstração'}</b></div></div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="b" onclick="apurar()" ${ONLINE?'':'disabled'}>Apurar agora (vendas do VR)</button>
+      ${ONLINE?'':'<button class="b o" onclick="simular(1)">Simular 1 dia (demonstração)</button><button class="b o" onclick="simular(7)">Simular 7 dias</button>'}
+      <button class="b o" onclick="S.vendas={};S.alertas=[];S.campanhas.forEach(c=>{if(c.status==='suspensa_orcamento')c.status='vigente';c.itens.forEach(i=>{if(i.status==='suspenso_orcamento')i.status='aprovado'})});save();render()">Zerar apuração</button>
+      <div style="flex:1 1 160px"><label>Data de referência (teste)</label>
+        <input type="date" value="${hoje()}" onchange="S.hojeSim=this.value;save();render()"></div></div></div>`));
+
+  m.appendChild(el(`<div class="card"><h2>Consumo por item</h2><div class="tw"><table>
+    <tr><th>Fornecedor</th><th>Campanha</th><th>Item</th><th class="n">Un.</th><th class="n">Verba</th><th class="n">% do teto</th></tr>
+    ${S.campanhas.flatMap(c=>c.itens.map(it=>{const x=consumoItem(c,it); if(!x.un) return '';
+      return `<tr><td class="small">${fornNome(c.fornKey)}</td><td class="small">${c.nome}</td><td>${it.desc}</td>
+        <td class="n">${fmt(x.un)}</td><td class="n">${fmtR(x.verba)}</td>
+        <td class="n">${it.orcamento?pct(x.verba/it.orcamento):'—'}</td></tr>`})).join('')
+      ||'<tr><td colspan="6" class="small">Nenhuma venda apurada ainda.</td></tr>'}</table></div></div>`));
+}
+function simular(dias){
+  for(let d=0;d<dias;d++){
+    const data=hoje();
+    S.campanhas.filter(c=>c.status==='vigente').forEach(c=>{
+      c.itens.filter(i=>itemVigente(c,i)).forEach(it=>{
+        c.lojas.forEach(l=>{ const k=`${it.ean}|${l}|${data}`;
+          S.vendas[k]=(S.vendas[k]||0)+Math.round(3+Math.random()*9) }) }) });
+    avaliar();
+    if(dias>1){ const n=new Date(hoje()); n.setDate(n.getDate()+1); S.hojeSim=n.toISOString().slice(0,10) }
+  }
+  save(); render();
+}
+
+/* ---------------- login com o PIN do Data Crítica ---------------- */
+function telaLogin(){
+  document.getElementById('nav').innerHTML='';
+  document.getElementById('perfil').style.display='none';
+  const m=document.getElementById('app'); m.innerHTML='';
+  m.appendChild(el(`<div class="card" style="max-width:420px;margin:40px auto">
+    <h2>Entrar</h2>
+    <p class="small">Use o mesmo usuário e PIN do app Data Crítica. Fornecedor entra de qualquer lugar e vê só as campanhas dele.</p>
+    <div style="margin-bottom:10px"><label>Usuário</label>
+      <select id="lgU">${USERS.filter(u=>['gestor','fornecedor','comercial'].includes(u.papel))
+        .map(u=>`<option value="${u.id}">${u.nome} — ${u.papel}</option>`).join('')}</select></div>
+    <div style="margin-bottom:12px"><label>PIN (6 dígitos)</label>
+      <input id="lgP" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')entrar()"></div>
+    <button class="b" style="width:100%" onclick="entrar()">Entrar</button>
+    <div id="lgMsg"></div></div>`));
+  setTimeout(()=>document.getElementById('lgP')?.focus(),100);
+}
+async function entrar(){
+  const id=document.getElementById('lgU').value, pin=document.getElementById('lgP').value.trim();
+  const msg=document.getElementById('lgMsg');
+  try{
+    const u=(await sb(`usuarios?select=*&id=eq.${id}&ativo=eq.true`))[0];
+    if(!u) throw new Error('usuário não encontrado');
+    const h=await sha256(pin);
+    if(!h){ msg.innerHTML='<div class="alert">Abra o app por HTTPS (GitHub Pages) — o navegador só valida o PIN em conexão segura.</div>'; return }
+    if(h!==u.pin_hash){ msg.innerHTML='<div class="alert">🔴 PIN incorreto.</div>'; return }
+    S.sessao={id:String(u.id),nome:u.nome,papel:u.papel,em:new Date().toISOString()};
+    S.perfil=String(u.id); save();
+    if(DB) await dbCarregar();
+    VIEW=''; render();
+  }catch(e){ msg.innerHTML=`<div class="alert">Falha ao entrar: ${e.message}</div>` }
+}
+function sair(){ S.sessao=null; save(); render() }
+const logado=()=>!ONLINE||!!S.sessao;
+
+/* ---------------- boot ---------------- */
+document.getElementById('perfil').onchange=e=>{ S.perfil=e.target.value; VIEW=''; DRAFT=null; save(); render() };
+load();
+conectar().then(render);
+// atualização automática: o fornecedor acompanha sem precisar recarregar a página
+setInterval(()=>{ if(DB&&logado()&&document.visibilityState==='visible') recarregar(true) },60000);
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible'&&DB&&logado()) recarregar(true) });
+window.estado=()=>S;   // usado nos testes
+</script>
+</body>
+</html>
