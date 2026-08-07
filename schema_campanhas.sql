@@ -9,7 +9,7 @@
 --                   ultimo_custo, preco_venda, estoque, vmd, ...)
 --     vendas_dia(ean, loja, data, qtd)        <- apuração da verba
 --     usuarios(id, nome, papel, loja, pin_hash, ativo, ids_fornecedor)
--- Logins e PINs são os mesmos. Aqui só entram os objetos NOVOS das verbas.
+-- usuarios.id é UUID neste projeto. Logins e PINs são os mesmos. Aqui só entram os objetos NOVOS das verbas.
 --
 -- Fornecedor é identificado pela RAZÃO SOCIAL AGLUTINADA (mesma regra do
 -- relatório mensal: upper + trim + espaços únicos), somando os CNPJs.
@@ -40,7 +40,7 @@ where id_fornecedor is not null;
 create table if not exists fornecedores_principais (
   fornecedor_chave text primary key,
   marcado_em       timestamptz not null default now(),
-  marcado_por      bigint references usuarios(id)
+  marcado_por      uuid references usuarios(id)
 );
 
 -- ---------- 2. REPRESENTANTES ----------
@@ -52,7 +52,7 @@ create table if not exists representantes (
   email            text,
   telefone         text,
   recebe_alertas   boolean not null default true,
-  usuario_id       bigint references usuarios(id), -- se também tem login
+  usuario_id       uuid references usuarios(id), -- se também tem login
   ativo            boolean not null default true,
   criado_em        timestamptz not null default now()
 );
@@ -85,8 +85,8 @@ create table if not exists campanhas (
   -- aguardando_aceite     = fornecedor propôs, falta o Gestor aceitar
   -- aguardando_fornecedor = Gestor criou, falta o fornecedor aceitar
   criada_em         timestamptz not null default now(),
-  criada_por        bigint references usuarios(id),
-  decidida_em       timestamptz, decidida_por bigint references usuarios(id),
+  criada_por        uuid references usuarios(id),
+  decidida_em       timestamptz, decidida_por uuid references usuarios(id),
   observacao        text,
   constraint periodo_valido check (fim >= inicio)
 );
@@ -108,7 +108,7 @@ create table if not exists campanha_itens (
   status            text not null default 'aguardando_aceite'
     check (status in ('aguardando_aceite','aguardando_fornecedor','aprovado','recusado',
                       'suspenso_orcamento','estancado','encerrado')),
-  decidido_em       timestamptz, decidido_por bigint references usuarios(id), motivo text,
+  decidido_em       timestamptz, decidido_por uuid references usuarios(id), motivo text,
   unique (campanha_id, ean)
 );
 
@@ -118,7 +118,7 @@ create table if not exists campanha_eventos (
   item_id     bigint references campanha_itens(id) on delete cascade,
   tipo        text not null,      -- proposta, alteracao, aceite, recusa, aumento_orcamento,
                                   -- estancar, suspensao, reativacao, encerramento
-  autor_id    bigint references usuarios(id), papel text,
+  autor_id    uuid references usuarios(id), papel text,
   de jsonb, para jsonb, mensagem text,
   criado_em   timestamptz not null default now()
 );
@@ -128,7 +128,7 @@ create table if not exists orcamento_ajustes (
   campanha_id bigint not null references campanhas(id) on delete cascade,
   item_id     bigint references campanha_itens(id) on delete cascade,   -- null = campanha
   de numeric(14,2), para numeric(14,2),
-  autor_id    bigint references usuarios(id),
+  autor_id    uuid references usuarios(id),
   criado_em   timestamptz not null default now()
 );
 

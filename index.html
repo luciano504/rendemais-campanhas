@@ -299,7 +299,10 @@ async function dbEvento(campId,itemId,tipo,msg){
     tipo,mensagem:msg,autor_id:idUsuarioBanco(),papel:usuario()?.papel,
     para:{autor:usuario()?.nome||'',item:null}},'return=minimal') }catch(e){}
 }
-const idUsuarioBanco=()=>{ const u=usuario(); return u&&/^\d+$/.test(String(u.id))?+u.id:null };
+const idUsuarioBanco=()=>{ const u=usuario(); const v=u?String(u.id):'';
+  if(/^\d+$/.test(v)) return +v;                                   // id numérico
+  if(/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(v)) return v;              // usuarios.id é uuid neste projeto
+  return null; };
 
 /* itens de um fornecedor (todas as lojas), com custo e preço reais */
 async function itensDoForn(fk){
