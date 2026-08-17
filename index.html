@@ -310,17 +310,31 @@ async function itensDoForn(fk){
   const f=FORN.find(x=>x.key===fk); if(!f) return [];
   loading(true);
   try{
-    const pl=await sbPag(`produtos_loja?select=ean,loja,ultimo_custo,preco_venda,estoque,id_fornecedor,nome_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',40000);
-    const eans=[...new Set(pl.map(x=>x.ean))];
+    // Base ativa do fornecedor: item com estoque e venda nos últimos 90 dias,
+    // montada pelo pipeline em catalogo_fornecedor. É ela que dá ao fornecedor
+    // o portfólio inteiro na hora de montar a campanha, sem incluir item a item.
+    // Se ainda não existir, cai no que o Data Crítica acompanha por validade.
+    let pl=[], daBase=false;
+    try{
+      pl=await sbPag(`catalogo_fornecedor?select=ean,loja,ultimo_custo,preco_venda,estoque,id_fornecedor,nome_fornecedor,descricao,secao&id_fornecedor=in.(${f.ids.join(',')})`,'',80000);
+      daBase = pl.length>0;
+    }catch(e){ pl=[]; daBase=false; }
+    if(!daBase){
+      pl=await sbPag(`produtos_loja?select=ean,loja,ultimo_custo,preco_venda,estoque,id_fornecedor,nome_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',40000);
+    }
     const descr={};
-    for(let i=0;i<eans.length;i+=300){
-      const parte=eans.slice(i,i+300).map(e=>`"${e}"`).join(',');
-      (await sb(`produtos?select=ean,descricao,secao&ean=in.(${parte})`)).forEach(p=>descr[p.ean]=p);
+    if(!daBase){
+      const eans=[...new Set(pl.map(x=>x.ean))];
+      for(let i=0;i<eans.length;i+=300){
+        const parte=eans.slice(i,i+300).map(e=>`"${e}"`).join(',');
+        (await sb(`produtos?select=ean,descricao,secao&ean=in.(${parte})`)).forEach(p=>descr[p.ean]=p);
+      }
     }
     const m={};
     pl.forEach(r=>{
-      const it=m[r.ean]||(m[r.ean]={ean:r.ean,desc:(descr[r.ean]||{}).descricao||r.ean,
-        secao:(descr[r.ean]||{}).secao||'(sem seção)',idf:r.id_fornecedor,lojas:{}});
+      const d = daBase ? {descricao:r.descricao, secao:r.secao} : (descr[r.ean]||{});
+      const it=m[r.ean]||(m[r.ean]={ean:r.ean,desc:d.descricao||r.ean,
+        secao:d.secao||'(sem seção)',idf:r.id_fornecedor,lojas:{}});
       it.lojas[r.loja]={custo:+r.ultimo_custo||0,preco:+r.preco_venda||0,estoque:+r.estoque||0};
     });
     CACHE.itens[fk]=Object.values(m).sort((a,b)=>a.desc.localeCompare(b.desc));
@@ -588,7 +602,7 @@ function vNova(m){
       <div style="flex:0 0 auto;align-self:flex-end;display:flex;gap:6px">
         <button class="b" onclick="addPorEAN()">+ Adicionar por EAN</button>
         <button class="b o" id="btScan" onclick="scanEAN()">📷 Bipar</button></div></div>
-    <div class="small" style="margin-top:4px">Só entram EANs da base de <b>${fornNome(d.fornKey)}</b> (id_fornecedor em produtos_loja). Item de outro fornecedor é recusado.</div>
+    <div class="small" style="margin-top:4px">Só entram EANs da base ativa de <b>${fornNome(d.fornKey)}</b> — item com estoque e venda nos últimos 90 dias. Item de outro fornecedor é recusado.</div>
     <div id="eanMsg"></div>
     <div id="itens" style="margin-top:12px">${d.itens.map(itemForm).join('')||'<p class="small">Nenhum item ainda.</p>'}</div>
   </div>`));
