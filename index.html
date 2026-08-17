@@ -590,11 +590,31 @@ function vNova(m){
       `<span class="chip ${d.lojas.includes(c)?'on':''}" onclick="togLoja('${c}')">${c} ${n}</span>`).join('')}</div>
   </div>`));
 
+    // A base de um fornecedor grande passa de 2 mil itens: sem separar por seção
+  // a lista vira um paredão. O filtro fica guardado fora do DRAFT porque é só
+  // uma forma de olhar, não faz parte da campanha.
+  const livres = disp.filter(p=>!d.itens.some(i=>i.ean===p.ean));
+  const secoes = [...new Set(livres.map(p=>p.secao||'(sem seção)'))].sort((a,b)=>a.localeCompare(b));
+  if(SECAO_FILTRO && !secoes.includes(SECAO_FILTRO)) SECAO_FILTRO='';
+  const naSecao = SECAO_FILTRO ? livres.filter(p=>(p.secao||'(sem seção)')===SECAO_FILTRO) : livres;
+  const porSecao = {};
+  naSecao.forEach(p=>{ const s=p.secao||'(sem seção)'; (porSecao[s]=porSecao[s]||[]).push(p) });
+  const opcoes = Object.keys(porSecao).sort((a,b)=>a.localeCompare(b)).map(s=>
+      `<optgroup label="${s} (${porSecao[s].length})">`
+      + porSecao[s].slice(0,1500).map(p=>`<option value="${p.ean}">${p.desc} — ${p.ean}</option>`).join('')
+      + `</optgroup>`).join('');
+
   m.appendChild(el(`<div class="card"><h2>2 · Itens da campanha</h2>
-    <div class="row"><div style="flex:3 1 320px"><label>Escolher no portfólio do fornecedor</label>
-      <select id="nProd">${disp.filter(p=>!d.itens.some(i=>i.ean===p.ean)).slice(0,3000)
-        .map(p=>`<option value="${p.ean}">${p.desc} — ${p.ean}</option>`).join('')||'<option value="">(nenhum item disponível)</option>'}</select></div>
+    <div class="row">
+      <div style="flex:1 1 220px"><label>Seção</label>
+        <select id="nSecao" onchange="filtraSecao(this.value)">
+          <option value="">Todas as seções (${livres.length} itens)</option>
+          ${secoes.map(s=>`<option value="${s}" ${s===SECAO_FILTRO?'selected':''}>${s} (${livres.filter(p=>(p.secao||'(sem seção)')===s).length})</option>`).join('')}
+        </select></div>
+      <div style="flex:3 1 320px"><label>Escolher no portfólio do fornecedor</label>
+      <select id="nProd">${opcoes||'<option value="">(nenhum item disponível)</option>'}</select></div>
       <div style="flex:0 0 auto;align-self:flex-end"><button class="b" onclick="addItem()">+ Adicionar</button></div></div>
+    <div class="small" style="margin-top:4px">${naSecao.length} item(ns) disponível(is)${SECAO_FILTRO?` na seção <b>${SECAO_FILTRO}</b>`:` em ${secoes.length} seção(ões)`}.</div>
     <h3>Ou digitar / bipar o código de barras</h3>
     <div class="row">
       <div style="flex:2 1 260px"><label>EAN — um por linha, ou separados por vírgula/espaço</label>
@@ -636,6 +656,8 @@ function novoItemDe(p){
     inicio:'',fim:'',custoRef:r.custo,precoRef:r.preco,precoMin:r.precoMin,precoMax:r.precoMax,
     alvoRef:alvoSecao(p.secao),status:'aguardando_aceite'};
 }
+let SECAO_FILTRO='';
+function filtraSecao(s){ SECAO_FILTRO=s||''; render() }
 function addItem(){ const e=document.getElementById('nProd').value; if(!e) return;
   const p=achaEAN(DRAFT.fornKey,e); if(p){DRAFT.itens.push(novoItemDe(p)); render()} }
 function addPorEAN(codigos){
