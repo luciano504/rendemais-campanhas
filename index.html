@@ -184,7 +184,7 @@ function load(){
 function save(){ localStorage.setItem(LS,JSON.stringify(S)) }
 
 /* ---------------- carga do cadastro real ---------------- */
-let FORN=[], USERS=[];
+let FORN=[], USERS=[], MANUAIS=[], ITENS_MANUAIS={}, ABSORVIDA={};
 async function conectar(){
   const st=document.getElementById('stConn');
   try{
@@ -198,8 +198,24 @@ async function conectar(){
       const k=chaveForn(l.nome_fornecedor);
       const a=mapa[k]||(mapa[k]={key:k,nome:l.nome_fornecedor||'(sem nome)',ids:new Set()});
       a.ids.add(l.id_fornecedor); });
-    FORN=Object.values(mapa).map(a=>({key:a.key,nome:a.nome,ids:[...a.ids]}))
-      .sort((a,b)=>a.nome.localeCompare(b.nome));
+    FORN=Object.values(mapa).map(a=>({key:a.key,nome:a.nome,ids:[...a.ids]}));
+    try{                                        // fornecedores cadastrados à mão
+      MANUAIS=await sb('fornecedores_manuais?select=*&ativo=eq.true');
+      MANUAIS.forEach(m=>{
+        const absorvidas=m.chaves_absorvidas||[];
+        // um cadastro só: soma os id_fornecedor das razões sociais agrupadas
+        const idsAbs=FORN.filter(f=>absorvidas.includes(f.key)).flatMap(f=>f.ids);
+        const ids=[...new Set([...(m.ids_fornecedor||[]),...idsAbs])];
+        const j=FORN.find(f=>f.key===m.fornecedor_chave);
+        if(j){ j.manual=true; j.cnpjs=m.cnpjs; j.ids=[...new Set([...j.ids,...ids])]; j.absorvidas=absorvidas }
+        else FORN.push({key:m.fornecedor_chave,nome:m.nome,ids,cnpjs:m.cnpjs||[],manual:true,absorvidas});
+        if(absorvidas.length){                       // as razões sociais somem da lista
+          FORN=FORN.filter(f=>!(absorvidas.includes(f.key)&&f.key!==m.fornecedor_chave));
+          absorvidas.forEach(k=>ABSORVIDA[k]=m.fornecedor_chave);
+        }
+      });
+    }catch(e){ MANUAIS=[]; console.warn('fornecedores manuais:',e.message) }
+    FORN.sort((a,b)=>a.nome.localeCompare(b.nome));
     // 2) usuários (mesmos logins do Data Crítica)
     try{ USERS=await sb('usuarios?select=id,nome,papel,loja,ids_fornecedor&ativo=eq.true&order=nome') }
     catch(e){ USERS=await sb('usuarios?select=id,nome,papel,loja&ativo=eq.true&order=nome') }
@@ -241,7 +257,7 @@ const mapItemDe=i=>({id:String(i.id),ean:i.ean,desc:i.descricao,secao:i.secao,
   preco:+i.preco_sugerido,verbaSug:+i.verba_sugerida,verba:+i.verba_unitaria,
   orcamento:+i.orcamento_item||0,inicio:d10(i.inicio_item),fim:d10(i.fim_item),
   custoRef:+i.custo_ref,precoRef:+i.preco_ref,alvoRef:+i.margem_alvo_ref,status:i.status});
-const mapCampDe=r=>({id:String(r.id),fornKey:r.fornecedor_chave,nome:r.nome,inicio:d10(r.inicio),fim:d10(r.fim),
+const mapCampDe=r=>({id:String(r.id),fornKey:ABSORVIDA[r.fornecedor_chave]||r.fornecedor_chave,nome:r.nome,inicio:d10(r.inicio),fim:d10(r.fim),
   orcamento:+r.orcamento_total,lojas:r.lojas||[],repId:r.representante_id?String(r.representante_id):'',
   origem:r.origem,pagamento:r.pagamento,status:r.status,criadaEm:r.criada_em,
   itens:(r.campanha_itens||[]).map(mapItemDe).sort((a,b)=>a.desc.localeCompare(b.desc)),
@@ -310,32 +326,37 @@ async function itensDoForn(fk){
   const f=FORN.find(x=>x.key===fk); if(!f) return [];
   loading(true);
   try{
-    // Base ativa do fornecedor: item com estoque e venda nos últimos 90 dias,
-    // montada pelo pipeline em catalogo_fornecedor. É ela que dá ao fornecedor
-    // o portfólio inteiro na hora de montar a campanha, sem incluir item a item.
-    // Se ainda não existir, cai no que o Data Crítica acompanha por validade.
-    let pl=[], daBase=false;
-    try{
-      pl=await sbPag(`catalogo_fornecedor?select=ean,loja,ultimo_custo,preco_venda,estoque,id_fornecedor,nome_fornecedor,descricao,secao&id_fornecedor=in.(${f.ids.join(',')})`,'',80000);
-      daBase = pl.length>0;
-    }catch(e){ pl=[]; daBase=false; }
-    if(!daBase){
-      pl=await sbPag(`produtos_loja?select=ean,loja,ultimo_custo,preco_venda,estoque,id_fornecedor,nome_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',40000);
-    }
+    const pl = f.ids.length
+      ? await sbPag(`produtos_loja?select=ean,loja,ultimo_custo,preco_venda,estoque,vmd14,id_fornecedor,nome_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',40000)
+      : [];
+    const eans=[...new Set(pl.map(x=>x.ean))];
     const descr={};
-    if(!daBase){
-      const eans=[...new Set(pl.map(x=>x.ean))];
-      for(let i=0;i<eans.length;i+=300){
-        const parte=eans.slice(i,i+300).map(e=>`"${e}"`).join(',');
-        (await sb(`produtos?select=ean,descricao,secao&ean=in.(${parte})`)).forEach(p=>descr[p.ean]=p);
-      }
+    for(let i=0;i<eans.length;i+=300){
+      const parte=eans.slice(i,i+300).map(e=>`"${e}"`).join(',');
+      (await sb(`produtos?select=ean,descricao,secao&ean=in.(${parte})`)).forEach(p=>descr[p.ean]=p);
     }
     const m={};
     pl.forEach(r=>{
-      const d = daBase ? {descricao:r.descricao, secao:r.secao} : (descr[r.ean]||{});
-      const it=m[r.ean]||(m[r.ean]={ean:r.ean,desc:d.descricao||r.ean,
-        secao:d.secao||'(sem seção)',idf:r.id_fornecedor,lojas:{}});
-      it.lojas[r.loja]={custo:+r.ultimo_custo||0,preco:+r.preco_venda||0,estoque:+r.estoque||0};
+      const it=m[r.ean]||(m[r.ean]={ean:r.ean,desc:(descr[r.ean]||{}).descricao||r.ean,
+        secao:(descr[r.ean]||{}).secao||'(sem seção)',idf:r.id_fornecedor,lojas:{}});
+      it.lojas[r.loja]={custo:+r.ultimo_custo||0,preco:+r.preco_venda||0,estoque:+r.estoque||0,vmd:+r.vmd14||0};
+    });
+    // itens associados manualmente a este fornecedor
+    try{
+      const mi=await sb(`fornecedor_itens_manuais?select=*&fornecedor_chave=eq.${encodeURIComponent(fk)}`);
+      ITENS_MANUAIS[fk]=mi;
+      for(const x of mi){
+        if(m[x.ean]) continue;                       // já veio da base do VR
+        let lojas={};
+        const base=await sb(`produtos_loja?select=loja,ultimo_custo,preco_venda,estoque&ean=eq.${encodeURIComponent(x.ean)}`).catch(()=>[]);
+        if(base.length) base.forEach(r=>lojas[r.loja]={custo:+r.ultimo_custo||0,preco:+r.preco_venda||0,estoque:+r.estoque||0});
+        else Object.keys(LOJAS).forEach(l=>lojas[l]={custo:+x.custo||0,preco:+x.preco||0,estoque:0});
+        m[x.ean]={ean:x.ean,desc:x.descricao||x.ean,secao:x.secao||'(sem seção)',manual:true,lojas};
+      }
+    }catch(e){ console.warn('itens manuais:',e.message) }
+    Object.values(m).forEach(it=>{                 // SKU ativo = tem preço e (estoque ou giro)
+      const ls=Object.values(it.lojas);
+      it.ativo = ls.some(l=>l.preco>0) && (ls.some(l=>l.estoque>0) || ls.some(l=>l.vmd>0) || it.manual);
     });
     CACHE.itens[fk]=Object.values(m).sort((a,b)=>a.desc.localeCompare(b.desc));
   }catch(e){ alert('Não consegui ler os itens: '+e.message); CACHE.itens[fk]=[] }
@@ -570,7 +591,9 @@ function vNova(m){
       <div style="flex:2 1 320px"><label>Fornecedor (razão social aglutinada)</label>
         <select onchange="trocaForn(this.value)">${ordForn().map(f=>
           `<option value="${f.key}" ${f.key===d.fornKey?'selected':''}>${S.principais.includes(f.key)?'★ ':''}${f.nome}${f.ids.length>1?` (${f.ids.length} CNPJs)`:''}</option>`).join('')}</select>
-        <div class="small" style="margin-top:4px">${disp.length} itens no portfólio · id_fornecedor: ${(FORN.find(f=>f.key===d.fornKey)||{ids:[]}).ids.join(', ')}</div></div>
+        <div class="small" style="margin-top:4px">${disp.filter(p=>p.ativo!==false).length} SKUs ativos de ${disp.length} · id_fornecedor: ${(FORN.find(f=>f.key===d.fornKey)||{ids:[]}).ids.join(', ')}
+          <label style="display:inline-flex;gap:4px;align-items:center;margin-left:8px;font-size:12px">
+            <input type="checkbox" ${S.soAtivos===false?'checked':''} onchange="S.soAtivos=!this.checked;save();render()"> mostrar inativos</label></div></div>
       <div><label>Representante</label><select onchange="DRAFT.repId=this.value">
         <option value="">—</option>${reps.map(r=>`<option value="${r.id}" ${r.id===d.repId?'selected':''}>${r.nome}${r.cargo?' · '+r.cargo:''}</option>`).join('')}</select></div></div>`:''}
     <div class="row">
@@ -590,31 +613,11 @@ function vNova(m){
       `<span class="chip ${d.lojas.includes(c)?'on':''}" onclick="togLoja('${c}')">${c} ${n}</span>`).join('')}</div>
   </div>`));
 
-    // A base de um fornecedor grande passa de 2 mil itens: sem separar por seção
-  // a lista vira um paredão. O filtro fica guardado fora do DRAFT porque é só
-  // uma forma de olhar, não faz parte da campanha.
-  const livres = disp.filter(p=>!d.itens.some(i=>i.ean===p.ean));
-  const secoes = [...new Set(livres.map(p=>p.secao||'(sem seção)'))].sort((a,b)=>a.localeCompare(b));
-  if(SECAO_FILTRO && !secoes.includes(SECAO_FILTRO)) SECAO_FILTRO='';
-  const naSecao = SECAO_FILTRO ? livres.filter(p=>(p.secao||'(sem seção)')===SECAO_FILTRO) : livres;
-  const porSecao = {};
-  naSecao.forEach(p=>{ const s=p.secao||'(sem seção)'; (porSecao[s]=porSecao[s]||[]).push(p) });
-  const opcoes = Object.keys(porSecao).sort((a,b)=>a.localeCompare(b)).map(s=>
-      `<optgroup label="${s} (${porSecao[s].length})">`
-      + porSecao[s].slice(0,1500).map(p=>`<option value="${p.ean}">${p.desc} — ${p.ean}</option>`).join('')
-      + `</optgroup>`).join('');
-
   m.appendChild(el(`<div class="card"><h2>2 · Itens da campanha</h2>
-    <div class="row">
-      <div style="flex:1 1 220px"><label>Seção</label>
-        <select id="nSecao" onchange="filtraSecao(this.value)">
-          <option value="">Todas as seções (${livres.length} itens)</option>
-          ${secoes.map(s=>`<option value="${s}" ${s===SECAO_FILTRO?'selected':''}>${s} (${livres.filter(p=>(p.secao||'(sem seção)')===s).length})</option>`).join('')}
-        </select></div>
-      <div style="flex:3 1 320px"><label>Escolher no portfólio do fornecedor</label>
-      <select id="nProd">${opcoes||'<option value="">(nenhum item disponível)</option>'}</select></div>
+    <div class="row"><div style="flex:3 1 320px"><label>Escolher no portfólio do fornecedor</label>
+      <select id="nProd">${disp.filter(p=>(S.soAtivos===false||p.ativo!==false)&&!d.itens.some(i=>i.ean===p.ean)).slice(0,3000)
+        .map(p=>`<option value="${p.ean}">${p.desc} — ${p.ean}</option>`).join('')||'<option value="">(nenhum item disponível)</option>'}</select></div>
       <div style="flex:0 0 auto;align-self:flex-end"><button class="b" onclick="addItem()">+ Adicionar</button></div></div>
-    <div class="small" style="margin-top:4px">${naSecao.length} item(ns) disponível(is)${SECAO_FILTRO?` na seção <b>${SECAO_FILTRO}</b>`:` em ${secoes.length} seção(ões)`}.</div>
     <h3>Ou digitar / bipar o código de barras</h3>
     <div class="row">
       <div style="flex:2 1 260px"><label>EAN — um por linha, ou separados por vírgula/espaço</label>
@@ -622,7 +625,7 @@ function vNova(m){
       <div style="flex:0 0 auto;align-self:flex-end;display:flex;gap:6px">
         <button class="b" onclick="addPorEAN()">+ Adicionar por EAN</button>
         <button class="b o" id="btScan" onclick="scanEAN()">📷 Bipar</button></div></div>
-    <div class="small" style="margin-top:4px">Só entram EANs da base ativa de <b>${fornNome(d.fornKey)}</b> — item com estoque e venda nos últimos 90 dias. Item de outro fornecedor é recusado.</div>
+    <div class="small" style="margin-top:4px">Só entram EANs da base de <b>${fornNome(d.fornKey)}</b> (id_fornecedor em produtos_loja). Item de outro fornecedor é recusado.</div>
     <div id="eanMsg"></div>
     <div id="itens" style="margin-top:12px">${d.itens.map(itemForm).join('')||'<p class="small">Nenhum item ainda.</p>'}</div>
   </div>`));
@@ -656,8 +659,6 @@ function novoItemDe(p){
     inicio:'',fim:'',custoRef:r.custo,precoRef:r.preco,precoMin:r.precoMin,precoMax:r.precoMax,
     alvoRef:alvoSecao(p.secao),status:'aguardando_aceite'};
 }
-let SECAO_FILTRO='';
-function filtraSecao(s){ SECAO_FILTRO=s||''; render() }
 function addItem(){ const e=document.getElementById('nProd').value; if(!e) return;
   const p=achaEAN(DRAFT.fornKey,e); if(p){DRAFT.itens.push(novoItemDe(p)); render()} }
 function addPorEAN(codigos){
@@ -679,7 +680,10 @@ function addPorEAN(codigos){
   if(ok.length)    h+=`<div class="alert i">✅ <b>${ok.length} item(ns) adicionado(s):</b> ${ok.map(x=>x.desc).join(', ')}</div>`;
   if(ja.length)    h+=`<div class="alert w">⚠️ Já estavam na campanha: ${ja.map(x=>x.desc).join(', ')}</div>`;
   if(outro.length) h+=`<div class="alert">🔴 <b>Não é da base deste fornecedor:</b> ${outro.map(x=>`${x.e} — ${x.p.desc} (${fornNome(x.fk)})`).join('; ')}</div>`;
-  if(nao.length)   h+=`<div class="alert">🔴 <b>EAN não encontrado no portfólio carregado:</b> ${nao.join(', ')}</div>`;
+  if(nao.length)   h+=`<div class="alert">🔴 <b>EAN não encontrado no portfólio deste fornecedor:</b> ${nao.join(', ')}</div>`;
+  if(ehGestor()&&(nao.length||outro.length))
+    h+=`<div class="alert i">➕ Quer incluir esse(s) item(ns) manualmente no portfólio de <b>${fornNome(DRAFT.fornKey)}</b>?
+      <div style="margin-top:6px"><button class="b s" onclick="itensManuais('${DRAFT.fornKey.replace(/'/g,"&#39;")}','${[...nao,...outro.map(x=>x.e)][0]||''}')">Cadastrar item manualmente</button></div></div>`;
   box.innerHTML=h;
 }
 async function scanEAN(){
@@ -966,16 +970,22 @@ function vForn(m){
   const lista=ordForn().filter(f=>!busca||f.nome.toUpperCase().includes(busca)).slice(0,400);
   m.appendChild(el(`<div class="card"><h2>Fornecedores <span class="small">(${FORN.length} razões sociais${ONLINE?' vindas do VR':' — demonstração'})</span></h2>
     <p class="small">Aglutinados pela razão social: uma linha por empresa, somando todos os id_fornecedor (CNPJs) — mesma regra do relatório mensal do Data Crítica. Marque os <b>principais</b> para eles subirem no topo.</p>
+    ${SELF.length?`<div class="alert i">${SELF.length} cadastro(s) marcado(s): ${SELF.join(' · ')}
+      <div style="margin-top:6px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="b s" onclick="agrupar()" ${SELF.length>1?'':'disabled'}>Juntar num cadastro só</button>
+        <button class="b s o" onclick="SELF=[];render()">limpar seleção</button></div></div>`:''}
     <div class="row"><div style="flex:2 1 260px"><label>Buscar</label>
       <input value="${S.buscaForn||''}" oninput="S.buscaForn=this.value;save();render()" placeholder="parte da razão social"></div></div>
     <div class="tw" style="margin-top:10px"><table>
-      <tr><th>Principal</th><th>Razão social</th><th class="n">CNPJs</th><th>Representantes</th><th class="n">Campanhas</th><th class="n">Consumido</th><th></th></tr>
+      <tr><th>Agrupar</th><th>Principal</th><th>Razão social</th><th class="n">CNPJs</th><th>Representantes</th><th class="n">Campanhas</th><th class="n">Consumido</th><th></th></tr>
       ${lista.map(f=>{
         const cs=S.campanhas.filter(c=>c.fornKey===f.key);
         const reps=S.reps.filter(r=>r.fornKey===f.key);
         return `<tr>
+          <td><input type="checkbox" ${SELF.includes(f.key)?'checked':''} onchange="togSel('${f.key.replace(/'/g,"&#39;")}')"></td>
           <td><input type="checkbox" ${S.principais.includes(f.key)?'checked':''} onchange="togPrincipal('${f.key.replace(/'/g,"\\'")}')"></td>
-          <td><b>${f.nome}</b><div class="small">ids: ${f.ids.join(', ')}</div></td>
+          <td><b>${f.nome}</b>${f.absorvidas&&f.absorvidas.length?` <span class="tag ok">grupo de ${f.absorvidas.length}</span>`:f.manual?' <span class="tag off">manual</span>':''}
+            <div class="small">ids: ${f.ids.join(', ')||'—'}${(f.cnpjs||[]).length?' · CNPJ '+f.cnpjs.join(', '):''}</div></td>
           <td class="n">${f.ids.length}</td>
           <td class="small">${reps.map(r=>r.nome).join('<br>')||'—'}</td>
           <td class="n">${cs.length}</td>
@@ -983,6 +993,123 @@ function vForn(m){
           <td><button class="b s o" onclick="novoDraft('${f.key.replace(/'/g,"\\'")}').then(()=>go('nova'))">Criar campanha</button></td></tr>`}).join('')}
     </table></div>
     ${lista.length>=400?'<p class="small">Mostrando os 400 primeiros — use a busca.</p>':''}</div>`));
+
+  m.appendChild(el(`<div class="card"><h2>Cadastrar fornecedor manualmente</h2>
+    <p class="small">Para indústria/representante que ainda não aparece em <code>produtos_loja</code>. Se você souber o(s) id_fornecedor do VR, informe — aí o portfólio dele vem automático. Sem isso, os itens são cadastrados um a um (ou pelo EAN, na montagem da campanha).</p>
+    <div class="row">
+      <div style="flex:2 1 260px"><label>Razão social</label><input id="mfNome" placeholder="Exatamente como na nota"></div>
+      <div><label>CNPJ(s) — separados por vírgula</label><input id="mfCnpj" placeholder="00.000.000/0001-00"></div>
+      <div><label>id_fornecedor no VR (opcional)</label><input id="mfIds" placeholder="1201, 1202"></div>
+      <div style="flex:2 1 220px"><label>Observação</label><input id="mfObs" placeholder="contato, condição combinada..."></div>
+      <div style="flex:0 0 auto;align-self:flex-end"><button class="b" onclick="addFornManual()">+ Cadastrar</button></div>
+    </div>
+    ${MANUAIS.length?`<h3>Cadastrados à mão</h3><div class="tw"><table>
+      <tr><th>Razão social</th><th>CNPJs</th><th>IDs VR</th><th>Itens manuais</th><th></th></tr>
+      ${MANUAIS.map(f=>`<tr><td>${f.nome}</td><td class="small">${(f.cnpjs||[]).join(', ')||'—'}</td>
+        <td class="small">${(f.ids_fornecedor||[]).join(', ')||'—'}</td>
+        <td class="n">${(ITENS_MANUAIS[f.fornecedor_chave]||[]).length||'—'}</td>
+        <td><button class="b s o" onclick="itensManuais('${f.fornecedor_chave.replace(/'/g,"&#39;")}')">Itens</button>
+            <button class="b s o" onclick="delFornManual('${f.fornecedor_chave.replace(/'/g,"&#39;")}')">excluir</button></td></tr>`).join('')}
+      </table></div>`:''}
+  </div>`));
+}
+async function addFornManual(){
+  const g=i=>document.getElementById(i).value.trim();
+  const nome=g('mfNome'); if(!nome) return alert('Informe a razão social.');
+  const chave=chaveForn(nome);
+  if(FORN.some(f=>f.key===chave)) return alert('Já existe fornecedor com essa razão social: '+chave);
+  const reg={fornecedor_chave:chave,nome,
+    cnpjs:g('mfCnpj').split(',').map(x=>x.trim()).filter(Boolean),
+    ids_fornecedor:g('mfIds').split(',').map(x=>parseInt(x)).filter(Boolean),
+    observacao:g('mfObs')||null,criado_por:idUsuarioBanco()};
+  if(DB){ try{ await sbPost('fornecedores_manuais',reg,'return=minimal') }
+          catch(e){ return alert('Não consegui gravar: '+e.message) } }
+  MANUAIS.push(reg);
+  FORN.push({key:chave,nome,ids:reg.ids_fornecedor,cnpjs:reg.cnpjs,manual:true});
+  FORN.sort((a,b)=>a.nome.localeCompare(b.nome));
+  delete CACHE.itens[chave];
+  if(!S.principais.includes(chave)) S.principais.push(chave);
+  save(); render();
+  alert('Fornecedor cadastrado. Ele já aparece na criação de campanha.');
+}
+async function delFornManual(chave){
+  if(!confirm('Excluir este fornecedor cadastrado à mão? As campanhas dele continuam no histórico.')) return;
+  if(DB){ try{ await sbPatch('fornecedores_manuais',`fornecedor_chave=eq.${encodeURIComponent(chave)}`,{ativo:false}) }
+          catch(e){ return alert('Falha: '+e.message) } }
+  MANUAIS=MANUAIS.filter(f=>f.fornecedor_chave!==chave);
+  FORN=FORN.filter(f=>!(f.key===chave&&f.manual));
+  save(); render();
+}
+function itensManuais(chave,eanPre){
+  const f=FORN.find(x=>x.key===chave)||{nome:chave};
+  const lista=ITENS_MANUAIS[chave]||[];
+  const inn=document.getElementById('dlgIn');
+  inn.innerHTML=`<h2>Itens de ${f.nome}</h2>
+    <p class="small">Cadastre pelo EAN. Se o item já existir na base do VR, custo e preço vêm de lá automaticamente; se não existir, informe custo e preço.</p>
+    <div class="row">
+      <div><label>EAN</label><input id="miEan" inputmode="numeric" value="${eanPre||''}"></div>
+      <div style="flex:2 1 180px"><label>Descrição</label><input id="miDesc"></div>
+      <div><label>Seção</label><input id="miSecao" placeholder="Mercearia"></div>
+      <div><label>Custo (R$)</label><input id="miCusto" type="number" step="0.01"></div>
+      <div><label>Preço cheio (R$)</label><input id="miPreco" type="number" step="0.01"></div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="b" onclick="addItemManual('${chave.replace(/'/g,"&#39;")}')">+ Adicionar item</button>
+      <button class="b o" onclick="document.getElementById('dlg').close()">Fechar</button></div>
+    <div class="tw" style="margin-top:12px"><table><tr><th>EAN</th><th>Descrição</th><th class="n">Custo</th><th class="n">Preço</th><th></th></tr>
+      ${lista.map(i=>`<tr><td class="small">${i.ean}</td><td>${i.descricao||'—'}</td>
+        <td class="n">${i.custo?fmt(i.custo):'da base'}</td><td class="n">${i.preco?fmt(i.preco):'da base'}</td>
+        <td><button class="b s o" onclick="delItemManual('${chave.replace(/'/g,"&#39;")}','${i.ean}')">x</button></td></tr>`).join('')
+        ||'<tr><td colspan="5" class="small">Nenhum item ainda.</td></tr>'}</table></div>`;
+  document.getElementById('dlg').showModal();
+}
+async function addItemManual(chave){
+  const g=i=>document.getElementById(i).value.trim();
+  const ean=soDig(g('miEan')); if(!ean) return alert('Informe o EAN.');
+  const reg={fornecedor_chave:chave,ean,descricao:g('miDesc')||null,secao:g('miSecao')||null,
+    custo:+g('miCusto')||null,preco:+g('miPreco')||null,criado_por:idUsuarioBanco()};
+  if(!reg.descricao&&!DB) return alert('Informe a descrição.');
+  if(DB){ try{ await sbPost('fornecedor_itens_manuais',reg,'return=minimal') }
+          catch(e){ return alert('Não consegui gravar: '+e.message) } }
+  (ITENS_MANUAIS[chave]=ITENS_MANUAIS[chave]||[]).push(reg);
+  delete CACHE.itens[chave];
+  await itensDoForn(chave);
+  itensManuais(chave); render();
+}
+async function delItemManual(chave,ean){
+  if(DB){ try{ await fetch(`${CFG.url}/rest/v1/fornecedor_itens_manuais?fornecedor_chave=eq.${encodeURIComponent(chave)}&ean=eq.${ean}`,
+    {method:'DELETE',headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key}}) }catch(e){} }
+  ITENS_MANUAIS[chave]=(ITENS_MANUAIS[chave]||[]).filter(i=>i.ean!==ean);
+  delete CACHE.itens[chave]; await itensDoForn(chave);
+  itensManuais(chave); render();
+}
+let SELF=[];
+function togSel(k){ const i=SELF.indexOf(k); i<0?SELF.push(k):SELF.splice(i,1); render() }
+async function agrupar(){
+  const grupos=SELF.map(k=>FORN.find(f=>f.key===k)).filter(Boolean);
+  if(grupos.length<2) return alert('Marque pelo menos dois cadastros.');
+  const palavras=grupos.map(g=>g.nome.split(/\s+/)[0]);
+  const sugestao=palavras.every(p=>p===palavras[0])?palavras[0]:grupos[0].nome;
+  const nome=prompt(`Juntar ${grupos.length} cadastros num só.\n\n${grupos.map(g=>'• '+g.nome+' ('+g.ids.join(',')+')').join('\n')}\n\nNome do cadastro único:`,sugestao);
+  if(!nome) return;
+  const chave=chaveForn(nome);
+  const ids=[...new Set(grupos.flatMap(g=>g.ids))];
+  const absorvidas=[...new Set([...grupos.map(g=>g.key),...grupos.flatMap(g=>g.absorvidas||[])])];
+  const reg={fornecedor_chave:chave,nome,ids_fornecedor:ids,chaves_absorvidas:absorvidas,
+             cnpjs:[...new Set(grupos.flatMap(g=>g.cnpjs||[]))],criado_por:idUsuarioBanco()};
+  loading(true);
+  try{
+    if(DB){
+      const ja=MANUAIS.find(m=>m.fornecedor_chave===chave);
+      if(ja) await sbPatch('fornecedores_manuais',`fornecedor_chave=eq.${encodeURIComponent(chave)}`,
+              {nome,ids_fornecedor:ids,chaves_absorvidas:absorvidas,ativo:true});
+      else    await sbPost('fornecedores_manuais',reg,'return=minimal');
+    }
+    SELF=[]; CACHE.itens={}; await conectar(); await itensDoForn(chave); render();
+    const n=itensCache(chave).filter(i=>i.ativo!==false).length;
+    alert(`Pronto: ${nome} agora é um cadastro só, com ${ids.length} id_fornecedor e ${n} SKUs ativos importados.`);
+  }catch(e){ alert('Não consegui agrupar: '+e.message) }
+  finally{ loading(false) }
 }
 function togPrincipal(k){ const i=S.principais.indexOf(k); i<0?S.principais.push(k):S.principais.splice(i,1); save(); render() }
 
