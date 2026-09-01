@@ -1231,30 +1231,53 @@ function telaLogin(){
   document.getElementById('nav').innerHTML='';
   document.getElementById('perfil').style.display='none';
   const m=document.getElementById('app'); m.innerHTML='';
+  const ultimo=localStorage.getItem('rmc_ultimo_nome')||'';
+  const modoOutra=LG_OUTRA||!ultimo;
+  const campoUser=modoOutra
+    ? `<div style="margin-bottom:10px"><label>Seu nome</label>
+        <input id="lgNome" placeholder="Digite seu nome" autocomplete="off"></div>`
+    : `<div style="margin-bottom:10px"><label>Usuário</label>
+        <div class="card" style="background:#f5f7fa;padding:10px;margin:0">
+          <b>${ultimo}</b><div class="small">Digite o PIN para entrar</div></div>
+        <input type="hidden" id="lgNome" value="${ultimo.replace(/"/g,'&quot;')}"></div>`;
   m.appendChild(el(`<div class="card" style="max-width:420px;margin:40px auto">
     <h2>Entrar</h2>
     <p class="small">Use o mesmo usuário e PIN do app Data Crítica. Fornecedor entra de qualquer lugar e vê só as campanhas dele.</p>
-    <div style="margin-bottom:10px"><label>Usuário</label>
-      <select id="lgU">${USERS.filter(u=>['gestor','fornecedor','comercial'].includes(u.papel))
-        .map(u=>`<option value="${u.id}">${u.nome} — ${u.papel}</option>`).join('')}</select></div>
-    <div style="margin-bottom:12px"><label>PIN (6 dígitos)</label>
+    ${campoUser}
+    <div style="margin-bottom:12px"><label>PIN</label>
       <input id="lgP" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password"
         onkeydown="if(event.key==='Enter')entrar()"></div>
     <button class="b" style="width:100%" onclick="entrar()">Entrar</button>
+    ${modoOutra
+      ? (ultimo?`<p class="small" style="text-align:center;margin-top:10px;cursor:pointer" onclick="LG_OUTRA=false;render()">‹ Voltar para ${ultimo}</p>`:'')
+      : `<p class="small" style="text-align:center;margin-top:10px;cursor:pointer;color:#1a3a6b" onclick="LG_OUTRA=true;render()">Sou outra pessoa</p>`}
     <div id="lgMsg"></div></div>`));
   setTimeout(()=>document.getElementById('lgP')?.focus(),100);
 }
+let LG_OUTRA=false;
+function normNome(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') }
 async function entrar(){
-  const id=document.getElementById('lgU').value, pin=document.getElementById('lgP').value.trim();
+  const nomeDig=(document.getElementById('lgNome')||{}).value||'';
+  const pin=document.getElementById('lgP').value.trim();
   const msg=document.getElementById('lgMsg');
+  if(!nomeDig.trim()||!pin){ msg.innerHTML='<div class="alert">Digite seu nome e o PIN.</div>'; return }
   try{
-    const u=(await sb(`usuarios?select=*&id=eq.${id}&ativo=eq.true`))[0];
-    if(!u) throw new Error('usuário não encontrado');
     const h=await sha256(pin);
     if(!h){ msg.innerHTML='<div class="alert">Abra o app por HTTPS (GitHub Pages) — o navegador só valida o PIN em conexão segura.</div>'; return }
-    if(h!==u.pin_hash){ msg.innerHTML='<div class="alert">🔴 PIN incorreto.</div>'; return }
+    const alvo=normNome(nomeDig);
+    const achados=(USERS||[]).filter(u=>normNome(u.nome)===alvo);
+    if(!achados.length){ msg.innerHTML='<div class="alert">🔴 Usuário não encontrado. Confira o nome ou use "Sou outra pessoa".</div>'; return }
+    const uLeve=achados.find(u=>true);
+    // busca o registro completo para conferir o pin (pode haver homônimo)
+    let u=null;
+    for(const cand of achados){
+      const full=(await sb(`usuarios?select=*&id=eq.${cand.id}&ativo=eq.true`))[0];
+      if(full && full.pin_hash===h){ u=full; break; }
+    }
+    if(!u){ msg.innerHTML='<div class="alert">🔴 PIN incorreto.</div>'; return }
     S.sessao={id:String(u.id),nome:u.nome,papel:u.papel,em:new Date().toISOString()};
     S.perfil=String(u.id); save();
+    localStorage.setItem('rmc_ultimo_nome',u.nome); LG_OUTRA=false;
     if(DB) await dbCarregar();
     VIEW=''; render();
   }catch(e){ msg.innerHTML=`<div class="alert">Falha ao entrar: ${e.message}</div>` }
