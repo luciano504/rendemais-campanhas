@@ -295,6 +295,14 @@ async function dbNovaCampanha(c){
     representante_id:c.repId?+c.repId:null,origem:c.origem,pagamento:c.pagamento,status:c.status,
     criada_por:idUsuarioBanco()}))[0];
   await sbPost('campanha_itens',c.itens.map(it=>itemPara(it,nova.id)),'return=minimal');
+  // o sync do VR só traz preço/custo/venda dos EANs que estão em `produtos` —
+  // registra os itens da campanha lá para o mostrador passar a andar sozinho
+  try{
+    await fetch(CFG.url+'/rest/v1/produtos',{method:'POST',
+      headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key,'Content-Type':'application/json',
+               Prefer:'resolution=ignore-duplicates,return=minimal'},
+      body:JSON.stringify(c.itens.map(it=>({ean:it.ean,descricao:(it.desc||'').slice(0,200),secao:it.secao||null})))});
+  }catch(e){ console.warn('registro em produtos:',e.message) }
   await dbEvento(nova.id,null,'proposta',(c.eventos[0]||{}).msg||'Campanha criada.');
   return String(nova.id);
 }
@@ -661,22 +669,40 @@ function novoItemDe(p){
 }
 function addItem(){ const e=document.getElementById('nProd').value; if(!e) return;
   const p=achaEAN(DRAFT.fornKey,e); if(p){DRAFT.itens.push(novoItemDe(p)); render()} }
-function addPorEAN(codigos){
+async function addPorEAN(codigos){
   const campo=document.getElementById('nEan');
   const lista=[...new Set(String(codigos||(campo?campo.value:'')).split(/[\s,;]+/).map(soDig).filter(Boolean))];
   if(!lista.length) return;
-  const ok=[],outro=[],nao=[],ja=[];
+  const ok=[],outro=[],nao=[],ja=[],pendentes=[],doCatalogo=[];
   lista.forEach(e=>{
     const p=achaEAN(DRAFT.fornKey,e);
     if(p){ if(DRAFT.itens.some(i=>semZ(i.ean)===semZ(e))) ja.push(p); else {DRAFT.itens.push(novoItemDe(p)); ok.push(p)} return }
     const alheio=achaEANqualquer(e);
-    alheio? outro.push({e,...alheio}) : nao.push(e);
+    if(alheio){ outro.push({e,...alheio}); return }
+    pendentes.push(e);
   });
+  // procura no catálogo do VR (180 mil EANs) o que não está no portfólio carregado
+  if(pendentes.length&&ONLINE){
+    try{
+      const lista=pendentes.map(e=>'"'+e+'"').join(',');
+      const achados=await sb(`catalogo?select=ean,descricao&ean=in.(${lista})`);
+      achados.forEach(x=>{
+        const p={ean:x.ean,desc:x.descricao||x.ean,secao:'(sem seção)',semPreco:true,
+                 lojas:Object.fromEntries(DRAFT.lojas.map(l=>[l,{custo:0,preco:0,estoque:0,vmd:0}]))};
+        (CACHE.itens[DRAFT.fornKey]=CACHE.itens[DRAFT.fornKey]||[]).push(p);
+        DRAFT.itens.push(novoItemDe(p)); doCatalogo.push(p);
+      });
+      const achou=new Set(achados.map(x=>semZ(x.ean)));
+      pendentes.filter(e=>!achou.has(semZ(e))).forEach(e=>nao.push(e));
+    }catch(err){ pendentes.forEach(e=>nao.push(e)) }
+  } else pendentes.forEach(e=>nao.push(e));
   const resto=[...outro.map(x=>x.e),...nao].join('\n');
   save(); render();
   const novo=document.getElementById('nEan'); if(novo) novo.value=resto;
   const box=document.getElementById('eanMsg'); if(!box) return;
   let h='';
+  if(doCatalogo.length) h+=`<div class="alert w">📦 <b>${doCatalogo.length} item(ns) do catálogo do VR sem preço na base ainda:</b> ${doCatalogo.map(x=>x.desc).join(', ')}.
+      Entraram na campanha; preço, custo e venda chegam no próximo sync (informe a verba e o preço promocional normalmente).</div>`;
   if(ok.length)    h+=`<div class="alert i">✅ <b>${ok.length} item(ns) adicionado(s):</b> ${ok.map(x=>x.desc).join(', ')}</div>`;
   if(ja.length)    h+=`<div class="alert w">⚠️ Já estavam na campanha: ${ja.map(x=>x.desc).join(', ')}</div>`;
   if(outro.length) h+=`<div class="alert">🔴 <b>Não é da base deste fornecedor:</b> ${outro.map(x=>`${x.e} — ${x.p.desc} (${fornNome(x.fk)})`).join('; ')}</div>`;
