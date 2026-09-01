@@ -736,7 +736,7 @@ function itemForm(it){
   const varia=it.precoMax&&it.precoMin&&it.precoMax-it.precoMin>0.001;
   return `<div class="itembox ${menos?'bad':''}">
     <div class="hd"><div><b>${it.desc}</b>
-      <div class="small">${it.ean} · ${it.secao} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)}${varia?` <span title="preços diferentes entre as lojas">(varia ${fmt(it.precoMin)}–${fmt(it.precoMax)})</span>`:''}</div></div>
+      <div class="small">${it.ean} · ${it.secao||'sem seção'} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)}${varia?` <span title="preços diferentes entre as lojas">(varia ${fmt(it.precoMin)}–${fmt(it.precoMax)})</span>`:''}</div></div>
       <button class="b s o" onclick="delItem('${it.id}')">remover</button></div>
     <div class="row" style="margin-top:9px">
       <div><label>Preço de venda sugerido</label><input type="number" step="0.01" value="${it.preco}" oninput="setIt('${it.id}','preco',this.value)"></div>
@@ -746,8 +746,8 @@ function itemForm(it){
         <input type="number" step="0.01" value="${it.verba}" oninput="setIt('${it.id}','verba',this.value)">
         <button class="b s o" onclick="stepVerba('${it.id}',0.05)">+</button></div></div>
       <div><label>Orçamento deste item (R$)</label><input type="number" step="0.01" value="${it.orcamento||''}" placeholder="sem teto próprio" oninput="setIt('${it.id}','orcamento',this.value)"></div>
-      <div><label>Início do item</label><input type="date" value="${it.inicio||''}" oninput="setIt('${it.id}','inicio',this.value)"></div>
-      <div><label>Fim do item</label><input type="date" value="${it.fim||''}" oninput="setIt('${it.id}','fim',this.value)"></div></div>
+      <div><label title="Em branco = segue o período da campanha">Início do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" value="${it.inicio||''}" oninput="setIt('${it.id}','inicio',this.value)"></div>
+      <div><label title="Em branco = segue o período da campanha">Fim do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" value="${it.fim||''}" oninput="setIt('${it.id}','fim',this.value)"></div></div>
     <div class="small" style="margin-top:6px">Desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'} ·
       Margem hoje <b>${fmtR(mgHoje)}</b> → com a verba <b style="color:${mgRS<mgHoje-0.0001?'var(--crit)':'var(--good)'}">${fmtR(mgRS)}</b> (${pct(mg)}) por unidade</div>
     ${menos?`<div class="alert">🔴 <b>Verba abaixo da sugerida.</b> Com ${fmtR(vb)} (sugerido ${fmtR(vs)}) a margem cai de ${fmtR(mgHoje)} para <b>${fmtR(mgRS)}</b> (${pct(mg)}) — perda de ${fmtR(vs-vb)} por unidade vendida.</div>`:''}
@@ -844,7 +844,7 @@ function painelCampanha(m,c){
       const x=consumoItem(c,it), r=it.orcamento?x.verba/it.orcamento:0, per=itemPeriodo(c,it);
       const mgRS=margemRS(it.preco,it.custoRef,it.verba), mgH=it.precoRef-it.custoRef;
       const cor=r>=1?'var(--crit)':r>=S.pctAlerta?'var(--warn)':'var(--good)';
-      return `<tr><td><b>${it.desc}</b><div class="small">${it.ean} · ${it.secao}</div></td>
+      return `<tr><td><b>${it.desc}</b><div class="small">${it.ean}${it.secao?' · '+it.secao:''}</div></td>
         <td class="n">${fmt(it.preco)}<div class="small">de ${fmt(it.precoRef)}</div></td>
         <td class="n">${fmt(it.verba)}${it.verba<it.verbaSug-.001?`<div class="small" style="color:var(--crit)">↓ sug. ${fmt(it.verbaSug)}</div>`:''}</td>
         <td class="n" style="color:${mgRS<mgH-.001?'var(--crit)':'inherit'}">${fmt(mgRS)}<div class="small">hoje ${fmt(mgH)}</div></td>
@@ -907,9 +907,12 @@ function vAprov(m){
           <option value="antecipado" ${c.pagamento==='antecipado'?'selected':''}>Antecipado</option></select></div></div>
       <div class="row" style="gap:6px;margin-top:8px">${Object.keys(LOJAS).map(l=>
         `<span class="chip ${c.lojas.includes(l)?'on':''}" onclick="togLojaC('${c.id}','${l}')">${l}</span>`).join('')}</div>
-      <h3>Itens propostos</h3><div id="apr_${c.id}"></div>
+      <h3>Itens propostos</h3>
+      <p class="small">Vigência e orçamento por item são <b>opcionais</b>: em branco, o item segue o período (${dbr(c.inicio)} a ${dbr(c.fim)}) e o teto da campanha. Preencha só na exceção.</p>
+      <div id="apr_${c.id}"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
         <button class="b g" onclick="decidirTudo('${c.id}',true)">Aceitar todos os itens pendentes</button>
+        <button class="b g o" onclick="aceitarSaudaveis('${c.id}')" title="Deixa pendentes os itens em que a verba não cobre a queda de margem">Aceitar só os que fecham a margem</button>
         <button class="b d" onclick="decidirTudo('${c.id}',false)">Recusar campanha</button></div></div>`));
     document.getElementById('apr_'+c.id).innerHTML=c.itens.map(it=>aprovForm(c,it)).join('');
   });
@@ -922,14 +925,14 @@ function aprovForm(c,it){
   const menos=vb<vs-0.0001, pend=it.status===stPend();
   return `<div class="itembox ${menos?'bad':''}">
     <div class="hd"><div><b>${it.desc}</b> ${statusTag(it.status)}
-      <div class="small">${it.ean} · ${it.secao} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)} · desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'}</div></div></div>
+      <div class="small">${it.ean} · ${it.secao||'sem seção'} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)} · desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'}</div></div></div>
     <div class="row" style="margin-top:8px">
       <div><label>Preço promocional</label><input type="number" step="0.01" id="a_p_${it.id}" value="${it.preco}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
       <div><label>Verba sugerida</label><input value="${fmt(vs)}" disabled></div>
       <div><label>Verba unitária</label><input type="number" step="0.01" id="a_v_${it.id}" value="${it.verba}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
       <div><label>Orçamento do item</label><input type="number" step="0.01" id="a_o_${it.id}" value="${it.orcamento||''}" ${pend?'':'disabled'}></div>
-      <div><label>Início do item</label><input type="date" id="a_i_${it.id}" value="${it.inicio||''}" ${pend?'':'disabled'}></div>
-      <div><label>Fim do item</label><input type="date" id="a_f_${it.id}" value="${it.fim||''}" ${pend?'':'disabled'}></div></div>
+      <div><label title="Em branco = segue o período da campanha">Início do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" id="a_i_${it.id}" value="${it.inicio||''}" ${pend?'':'disabled'}></div>
+      <div><label title="Em branco = segue o período da campanha">Fim do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" id="a_f_${it.id}" value="${it.fim||''}" ${pend?'':'disabled'}></div></div>
     <div class="small" style="margin-top:6px">Margem hoje <b>${fmtR(mgH)}</b> → com a verba
       <b style="color:${mgRS<mgH-.001?'var(--crit)':'var(--good)'}">${fmtR(mgRS)}</b> (${pct(mg)})
       · o teto do item paga ${it.orcamento&&vb?fmt(it.orcamento/vb)+' un.':'—'}</div>
@@ -968,6 +971,19 @@ function decidir(cid,iid,ok){
   if(c.itens.some(i=>i.status==='aprovado')&&['aguardando_aceite','aguardando_fornecedor'].includes(c.status)) c.status='vigente';
   if(c.itens.every(i=>i.status==='recusado')) c.status='recusada';
   save(); dbSyncCamp(c); render();
+}
+function aceitarSaudaveis(cid){
+  const c=camp(cid); lerGeral(c);
+  const pend=c.itens.filter(i=>i.status===stPend());
+  const bons=pend.filter(it=>margemRS(it.preco,it.custoRef,it.verba)>0);
+  const ruins=pend.length-bons.length;
+  if(!bons.length) return alert('Nenhum item pendente fecha a margem com a verba oferecida.');
+  if(!confirm(`Aceitar ${bons.length} item(ns) que fecham a margem e deixar ${ruins} pendente(s) para negociar?`)) return;
+  bons.forEach(it=>{ lerAprov(c,it); it.status='aprovado';
+    ev(c,it,'aceite',`aceito a ${fmtR(it.preco)} com verba de ${fmtR(it.verba)}/un.`) });
+  if(c.itens.some(i=>i.status==='aprovado')&&['aguardando_aceite','aguardando_fornecedor'].includes(c.status)) c.status='vigente';
+  save(); dbSyncCamp(c); render();
+  alert(`${bons.length} itens aprovados. Os ${ruins} com margem negativa continuam aguardando sua decisão.`);
 }
 function decidirTudo(cid,ok){
   const c=camp(cid); lerGeral(c);
@@ -1231,53 +1247,30 @@ function telaLogin(){
   document.getElementById('nav').innerHTML='';
   document.getElementById('perfil').style.display='none';
   const m=document.getElementById('app'); m.innerHTML='';
-  const ultimo=localStorage.getItem('rmc_ultimo_nome')||'';
-  const modoOutra=LG_OUTRA||!ultimo;
-  const campoUser=modoOutra
-    ? `<div style="margin-bottom:10px"><label>Seu nome</label>
-        <input id="lgNome" placeholder="Digite seu nome" autocomplete="off"></div>`
-    : `<div style="margin-bottom:10px"><label>Usuário</label>
-        <div class="card" style="background:#f5f7fa;padding:10px;margin:0">
-          <b>${ultimo}</b><div class="small">Digite o PIN para entrar</div></div>
-        <input type="hidden" id="lgNome" value="${ultimo.replace(/"/g,'&quot;')}"></div>`;
   m.appendChild(el(`<div class="card" style="max-width:420px;margin:40px auto">
     <h2>Entrar</h2>
     <p class="small">Use o mesmo usuário e PIN do app Data Crítica. Fornecedor entra de qualquer lugar e vê só as campanhas dele.</p>
-    ${campoUser}
-    <div style="margin-bottom:12px"><label>PIN</label>
+    <div style="margin-bottom:10px"><label>Usuário</label>
+      <select id="lgU">${USERS.filter(u=>['gestor','fornecedor','comercial'].includes(u.papel))
+        .map(u=>`<option value="${u.id}">${u.nome} — ${u.papel}</option>`).join('')}</select></div>
+    <div style="margin-bottom:12px"><label>PIN (6 dígitos)</label>
       <input id="lgP" type="password" inputmode="numeric" maxlength="6" autocomplete="current-password"
         onkeydown="if(event.key==='Enter')entrar()"></div>
     <button class="b" style="width:100%" onclick="entrar()">Entrar</button>
-    ${modoOutra
-      ? (ultimo?`<p class="small" style="text-align:center;margin-top:10px;cursor:pointer" onclick="LG_OUTRA=false;render()">‹ Voltar para ${ultimo}</p>`:'')
-      : `<p class="small" style="text-align:center;margin-top:10px;cursor:pointer;color:#1a3a6b" onclick="LG_OUTRA=true;render()">Sou outra pessoa</p>`}
     <div id="lgMsg"></div></div>`));
   setTimeout(()=>document.getElementById('lgP')?.focus(),100);
 }
-let LG_OUTRA=false;
-function normNome(s){ return String(s||'').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'') }
 async function entrar(){
-  const nomeDig=(document.getElementById('lgNome')||{}).value||'';
-  const pin=document.getElementById('lgP').value.trim();
+  const id=document.getElementById('lgU').value, pin=document.getElementById('lgP').value.trim();
   const msg=document.getElementById('lgMsg');
-  if(!nomeDig.trim()||!pin){ msg.innerHTML='<div class="alert">Digite seu nome e o PIN.</div>'; return }
   try{
+    const u=(await sb(`usuarios?select=*&id=eq.${id}&ativo=eq.true`))[0];
+    if(!u) throw new Error('usuário não encontrado');
     const h=await sha256(pin);
     if(!h){ msg.innerHTML='<div class="alert">Abra o app por HTTPS (GitHub Pages) — o navegador só valida o PIN em conexão segura.</div>'; return }
-    const alvo=normNome(nomeDig);
-    const achados=(USERS||[]).filter(u=>normNome(u.nome)===alvo);
-    if(!achados.length){ msg.innerHTML='<div class="alert">🔴 Usuário não encontrado. Confira o nome ou use "Sou outra pessoa".</div>'; return }
-    const uLeve=achados.find(u=>true);
-    // busca o registro completo para conferir o pin (pode haver homônimo)
-    let u=null;
-    for(const cand of achados){
-      const full=(await sb(`usuarios?select=*&id=eq.${cand.id}&ativo=eq.true`))[0];
-      if(full && full.pin_hash===h){ u=full; break; }
-    }
-    if(!u){ msg.innerHTML='<div class="alert">🔴 PIN incorreto.</div>'; return }
+    if(h!==u.pin_hash){ msg.innerHTML='<div class="alert">🔴 PIN incorreto.</div>'; return }
     S.sessao={id:String(u.id),nome:u.nome,papel:u.papel,em:new Date().toISOString()};
     S.perfil=String(u.id); save();
-    localStorage.setItem('rmc_ultimo_nome',u.nome); LG_OUTRA=false;
     if(DB) await dbCarregar();
     VIEW=''; render();
   }catch(e){ msg.innerHTML=`<div class="alert">Falha ao entrar: ${e.message}</div>` }
