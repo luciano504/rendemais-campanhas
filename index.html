@@ -133,6 +133,10 @@ const dbr=d=>d?String(d).slice(0,10).split('-').reverse().join('/'):'—';
 const uid=()=>Math.random().toString(36).slice(2,9);
 const el=h=>{const d=document.createElement('div');d.innerHTML=h.trim();return d.firstChild};
 const soDig=s=>String(s||'').replace(/\D/g,'');
+const valorBR=v=>{ const t=String(v==null?'':v).replace(/[^\d,.-]/g,'');
+  // 1.234,56 -> 1234.56 ; 1234.56 -> 1234.56
+  const br=/,\d{1,2}$/.test(t);
+  return +(br? t.replace(/\./g,'').replace(',','.') : t.replace(/,/g,'')) || 0; };
 const semZ=s=>soDig(s).replace(/^0+/,'');
 // chave de aglutinação de fornecedor — igual à do Data Crítica
 const chaveForn=n=>String(n||'(sem nome)').trim().toUpperCase().replace(/\s+/g,' ');
@@ -349,6 +353,14 @@ async function itensDoForn(fk){
         secao:(descr[r.ean]||{}).secao||'(sem seção)',idf:r.id_fornecedor,lojas:{}});
       it.lojas[r.loja]={custo:+r.ultimo_custo||0,preco:+r.preco_venda||0,estoque:+r.estoque||0,vmd:+r.vmd14||0};
     });
+    // id_produto (produto PAI no VR) de cada EAN, para o diálogo pai/filho e para as placas
+    try{
+      const todos=Object.keys(m);
+      for(let i=0;i<todos.length;i+=150){
+        const parte=todos.slice(i,i+150).map(e=>'"'+e+'"').join(',');
+        (await sb(`catalogo?select=ean,id_produto&ean=in.(${parte})`)).forEach(c=>{ if(m[c.ean]) m[c.ean].idProduto=c.id_produto });
+      }
+    }catch(e){ console.warn('id_produto:',e.message) }
     // itens associados manualmente a este fornecedor
     try{
       const mi=await sb(`fornecedor_itens_manuais?select=*&fornecedor_chave=eq.${encodeURIComponent(fk)}`);
@@ -571,7 +583,9 @@ function vMinhas(m){
       <div><b>${c.nome}</b> ${statusTag(c.status)}
         <div class="small">${c.itens.length} itens · ${dbr(c.inicio)} a ${dbr(c.fim)} · ${c.lojas.join(', ')}
         · ${c.pagamento==='antecipado'?'💰 verba antecipada':'🧾 paga após a apuração'}${c.origem==='gestor'?' · criada pelo Gestor':''}</div></div>
-      <div style="display:flex;gap:6px">${c.status==='aguardando_fornecedor'?`<button class="b s g" onclick="go('aprov')">Analisar</button>`:''}
+      <div style="display:flex;gap:6px;flex-wrap:wrap">${c.status==='aguardando_fornecedor'?`<button class="b s g" onclick="go('aprov')">Analisar</button>`:''}
+        ${['vigente','suspensa_orcamento'].includes(c.status)?`<button class="b s d" onclick="estancar('${c.id}',null)">Cancelar promoção</button>`:''}
+        ${c.status==='vigente'?`<button class="b s o" onclick="enviarPlacas('${c.id}')">🖨️ Placas</button>`:''}
         <button class="b s o" onclick="SEL='${c.id}';go('acomp')">Abrir</button></div></div>
       <div style="margin-top:9px">${meter(consumoCamp(c).verba,c.orcamento,'Orçamento da campanha')}</div></div>`).join('')}
   </div>`));
@@ -608,7 +622,8 @@ function vNova(m){
       <div style="flex:2 1 240px"><label>Nome da campanha</label><input id="nNome" value="${d.nome}" placeholder="Ex.: Encarte de Agosto"></div>
       <div><label>Início (geral)</label><input type="date" id="nIni" value="${d.inicio}"></div>
       <div><label>Fim (geral)</label><input type="date" id="nFim" value="${d.fim}"></div>
-      <div><label>Orçamento total (R$)</label><input type="number" step="0.01" id="nOrc" value="${d.orcamento}"></div>
+      <div><label>Orçamento total (R$)</label>
+        <input type="text" inputmode="decimal" id="nOrc" value="${fmt(d.orcamento)}" placeholder="50.000,00"></div>
       <div style="flex:1 1 210px"><label>Pagamento da verba</label>
         <select onchange="DRAFT.pagamento=this.value;render()">
           <option value="pos" ${d.pagamento==='pos'?'selected':''}>Após a apuração</option>
@@ -621,11 +636,34 @@ function vNova(m){
       `<span class="chip ${d.lojas.includes(c)?'on':''}" onclick="togLoja('${c}')">${c} ${n}</span>`).join('')}</div>
   </div>`));
 
+  const secoes=[...new Set(disp.map(p=>p.secao||'sem seção'))].sort();
+  const busca=(S.buscaItem||'').toUpperCase(), secFiltro=S.secFiltro||'';
+  const lista=disp.filter(p=>(S.soAtivos===false||p.ativo!==false)
+      && !d.itens.some(i=>i.ean===p.ean)
+      && (!secFiltro||(p.secao||'sem seção')===secFiltro)
+      && (!busca||p.desc.toUpperCase().includes(busca)||p.ean.includes(busca)));
   m.appendChild(el(`<div class="card"><h2>2 · Itens da campanha</h2>
-    <div class="row"><div style="flex:3 1 320px"><label>Escolher no portfólio do fornecedor</label>
-      <select id="nProd">${disp.filter(p=>(S.soAtivos===false||p.ativo!==false)&&!d.itens.some(i=>i.ean===p.ean)).slice(0,3000)
-        .map(p=>`<option value="${p.ean}">${p.desc} — ${p.ean}</option>`).join('')||'<option value="">(nenhum item disponível)</option>'}</select></div>
-      <div style="flex:0 0 auto;align-self:flex-end"><button class="b" onclick="addItem()">+ Adicionar</button></div></div>
+    <div class="row">
+      <div style="flex:2 1 240px"><label>Buscar no portfólio (descrição ou EAN)</label>
+        <input value="${S.buscaItem||''}" oninput="S.buscaItem=this.value;save();render()" placeholder="ex.: shampoo, 350ml, 78910..."></div>
+      <div style="flex:1 1 200px"><label>Seção / mercadológico</label>
+        <select onchange="S.secFiltro=this.value;save();render()">
+          <option value="">Todas (${disp.length} itens)</option>
+          ${secoes.map(x=>`<option value="${x}" ${secFiltro===x?'selected':''}>${x} (${disp.filter(p=>(p.secao||'sem seção')===x).length})</option>`).join('')}</select></div>
+      <div style="flex:0 0 auto;align-self:flex-end;display:flex;gap:6px">
+        <button class="b" onclick="addSelecionados()">+ Adicionar marcados</button>
+        <button class="b o" onclick="marcarTodosItens(true)">marcar os ${Math.min(lista.length,300)}</button>
+        <button class="b o" onclick="marcarTodosItens(false)">limpar</button></div>
+    </div>
+    <div class="tw" style="max-height:300px;overflow:auto;border:1px solid var(--line);border-radius:8px;margin-top:8px">
+      <table><tr><th style="width:34px"></th><th>Item</th><th>Seção</th><th class="n">Custo</th><th class="n">Preço</th><th class="n">Estoque</th></tr>
+      ${lista.slice(0,300).map(p=>{const r=refs(p,d.lojas), est=Object.values(p.lojas).reduce((a,l)=>a+(+l.estoque||0),0);
+        return `<tr><td><input type="checkbox" ${SELI.includes(p.ean)?'checked':''} onchange="togItem('${p.ean}')"></td>
+          <td>${p.desc}<div class="small">${p.ean}${p.ativo===false?' · <span style="color:var(--warn)">sem giro</span>':''}</div></td>
+          <td class="small">${p.secao||'sem seção'}</td><td class="n">${fmt(r.custo)}</td><td class="n">${fmt(r.preco)}</td>
+          <td class="n">${fmt(est)}</td></tr>`}).join('')||'<tr><td colspan="6" class="small">Nenhum item com esse filtro.</td></tr>'}
+      </table></div>
+    <div class="small" style="margin-top:4px">${lista.length} item(ns) no filtro${lista.length>300?' — mostrando os 300 primeiros':''} · ${SELI.length} marcado(s)</div>
     <h3>Ou digitar / bipar o código de barras</h3>
     <div class="row">
       <div style="flex:2 1 260px"><label>EAN — um por linha, ou separados por vírgula/espaço</label>
@@ -640,7 +678,7 @@ function vNova(m){
 
   m.appendChild(el(`<div class="card"><div class="kpi">
       <div><span>Itens</span><b>${d.itens.length}</b></div>
-      <div><span>Orçamento da campanha</span><b>${fmtR(d.orcamento)}</b></div>
+      <div><span>Orçamento da campanha</span><b id="kpiOrc">${fmtR(d.orcamento)}</b></div>
       <div><span>Soma dos tetos por item</span><b style="color:${soma>(+d.orcamento||0)?'var(--warn)':'inherit'}">${fmtR(soma)}</b></div></div>
     ${soma>(+d.orcamento||0)?`<div class="alert w">⚠️ A soma dos tetos por item supera o orçamento da campanha. O teto da campanha prevalece.</div>`:''}
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
@@ -650,7 +688,8 @@ function vNova(m){
 
   ['nNome','nIni','nFim','nOrc'].forEach(id=>{const e=document.getElementById(id);
     e.oninput=()=>{const k={nNome:'nome',nIni:'inicio',nFim:'fim',nOrc:'orcamento'}[id];
-      DRAFT[k]=id==='nOrc'?+e.value:e.value; if(id==='nOrc') render()}});
+      DRAFT[k]=id==='nOrc'?valorBR(e.value):e.value;
+      if(id==='nOrc'){ const kpi=document.getElementById('kpiOrc'); if(kpi) kpi.textContent=fmtR(DRAFT.orcamento) } }});
   if(!('BarcodeDetector' in window)){const b=document.getElementById('btScan'); if(b){b.disabled=true;b.title='Precisa de HTTPS e navegador compatível'}}
 }
 function ordForn(){ return [...FORN].sort((a,b)=>
@@ -660,6 +699,61 @@ function togLoja(c){ const L=DRAFT.lojas, i=L.indexOf(c); i<0?L.push(c):L.splice
     it.custoRef=r.custo; it.precoRef=r.preco; it.verbaSug=verbaSugerida(r.preco,it.preco); it.verba=it.verbaSug}});
   render(); }
 
+/* --- produto PAI (id_produto do VR) x FILHOS (EANs: unidade, caixa/DUN) --- */
+async function irmaosDe(eans){
+  if(!ONLINE) return {};
+  const out={};
+  try{
+    const alvo=[...new Set(eans)], ids={};
+    for(let i=0;i<alvo.length;i+=150){
+      const parte=alvo.slice(i,i+150).map(e=>'"'+e+'"').join(',');
+      (await sb(`catalogo?select=ean,id_produto&ean=in.(${parte})`)).forEach(c=>{ if(c.id_produto) ids[c.ean]=c.id_produto });
+    }
+    const listaIds=[...new Set(Object.values(ids))];
+    if(!listaIds.length) return {};
+    let fam=[];
+    for(let i=0;i<listaIds.length;i+=100)
+      fam=fam.concat(await sb(`catalogo?select=ean,id_produto,descricao&id_produto=in.(${listaIds.slice(i,i+100).join(',')})`));
+    const porId={}; fam.forEach(f=>{(porId[f.id_produto]=porId[f.id_produto]||[]).push(f)});
+    Object.entries(ids).forEach(([ean,id])=>{ const g=porId[id]||[]; if(g.length>1) out[ean]=g });
+  }catch(e){ console.warn('irmaos:',e.message) }
+  return out;
+}
+function comIrmaos(eans){
+  return new Promise(async resolve=>{
+    const fam=await irmaosDe(eans);
+    const comFamilia=Object.keys(fam);
+    if(!comFamilia.length) return resolve(eans);
+    const dlg=document.getElementById('dlg'), inn=document.getElementById('dlgIn');
+    const linhas=[];
+    comFamilia.forEach(ean=>fam[ean].forEach(f=>{
+      if(linhas.some(l=>l.ean===f.ean)) return;
+      linhas.push({ean:f.ean,desc:f.descricao,unidade:String(f.ean).length<=13,pedido:semZ(f.ean)===semZ(ean)});
+    }));
+    const soltos=eans.filter(e=>!comFamilia.includes(e));
+    inn.innerHTML=`<h2>Produto pai e embalagens</h2>
+      <p class="small">${comFamilia.length} item(ns) escolhido(s) tem mais de um codigo no VR — a unidade e a caixa/DUN do mesmo produto.
+      Marque o que entra na campanha: a venda so e apurada nos codigos marcados.</p>
+      <div class="tw" style="max-height:320px;overflow:auto"><table>
+        <tr><th style="width:34px"></th><th>Codigo</th><th>Descricao</th><th>Tipo</th></tr>
+        ${linhas.map((l,i)=>`<tr><td><input type="checkbox" id="ir_${i}" ${l.pedido||l.unidade?'checked':''}></td>
+          <td class="small">${l.ean}</td><td>${l.desc}</td>
+          <td class="small">${l.unidade?'unidade':'caixa / DUN'}${l.pedido?' · <b>o que voce pediu</b>':''}</td></tr>`).join('')}
+      </table></div>
+      <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="b" id="irOk">Incluir os marcados</button>
+        <button class="b o" id="irUnid">So as unidades</button>
+        <button class="b o" id="irTudo">Tudo (pai + embalagens)</button>
+        <button class="b o" id="irCancel">Cancelar</button></div>`;
+    dlg.showModal();
+    const fecha=r=>{ dlg.close(); resolve(r) };
+    document.getElementById('irOk').onclick=()=>fecha([...soltos,...linhas.filter((l,i)=>document.getElementById('ir_'+i).checked).map(l=>l.ean)]);
+    document.getElementById('irUnid').onclick=()=>fecha([...soltos,...linhas.filter(l=>l.unidade).map(l=>l.ean)]);
+    document.getElementById('irTudo').onclick=()=>fecha([...soltos,...linhas.map(l=>l.ean)]);
+    document.getElementById('irCancel').onclick=()=>fecha(soltos);
+  });
+}
+
 function novoItemDe(p){
   const r=refs(p,DRAFT.lojas);
   const precoSug=+(r.preco*0.88).toFixed(2), vs=verbaSugerida(r.preco,precoSug);
@@ -667,11 +761,27 @@ function novoItemDe(p){
     inicio:'',fim:'',custoRef:r.custo,precoRef:r.preco,precoMin:r.precoMin,precoMax:r.precoMax,
     alvoRef:alvoSecao(p.secao),status:'aguardando_aceite'};
 }
-function addItem(){ const e=document.getElementById('nProd').value; if(!e) return;
-  const p=achaEAN(DRAFT.fornKey,e); if(p){DRAFT.itens.push(novoItemDe(p)); render()} }
-async function addPorEAN(codigos){
+let SELI=[];
+function togItem(ean){ const i=SELI.indexOf(ean); i<0?SELI.push(ean):SELI.splice(i,1); render() }
+function marcarTodosItens(on){
+  const disp=itensCache(DRAFT.fornKey);
+  const busca=(S.buscaItem||'').toUpperCase(), sec=S.secFiltro||'';
+  const lista=disp.filter(p=>(S.soAtivos===false||p.ativo!==false)&&!DRAFT.itens.some(i=>i.ean===p.ean)
+    &&(!sec||(p.secao||'sem seção')===sec)&&(!busca||p.desc.toUpperCase().includes(busca)||p.ean.includes(busca))).slice(0,300);
+  SELI = on ? [...new Set([...SELI,...lista.map(p=>p.ean)])] : [];
+  render();
+}
+async function addSelecionados(){
+  if(!SELI.length) return alert('Marque os itens que quer incluir.');
+  const escolhidos=await comIrmaos(SELI);
+  SELI=[];
+  await addPorEAN(escolhidos.join(' '), true);   // reaproveita a inclusão (busca no catálogo o que faltar)
+}
+async function addPorEAN(codigos,jaPerguntou){
   const campo=document.getElementById('nEan');
-  const lista=[...new Set(String(codigos||(campo?campo.value:'')).split(/[\s,;]+/).map(soDig).filter(Boolean))];
+  let lista=[...new Set(String(codigos||(campo?campo.value:'')).split(/[\s,;]+/).map(soDig).filter(Boolean))];
+  if(!lista.length) return;
+  if(!jaPerguntou) lista=await comIrmaos(lista);   // pergunta unidade x caixa/DUN quando o produto tiver mais de um EAN
   if(!lista.length) return;
   const ok=[],outro=[],nao=[],ja=[],pendentes=[],doCatalogo=[];
   lista.forEach(e=>{
@@ -832,10 +942,11 @@ function painelCampanha(m,c){
     ${c.status==='suspensa_orcamento'?`<div class="alert">⛔ <b>Orçamento da campanha esgotado.</b> Todas as promoções foram desfeitas.
       <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
         <button class="b" onclick="aumentar('${c.id}',null)">Aumentar o orçamento e reativar</button>
-        <button class="b d" onclick="estancar('${c.id}',null)">Estancar a campanha</button></div></div>`:''}
+        <button class="b d" onclick="estancar('${c.id}',null)">Cancelar a campanha</button></div></div>`:''}
     ${c.status==='vigente'?`<div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="b s" onclick="enviarPlacas('${c.id}')">🖨️ Mandar para o Placas</button>
       <button class="b o s" onclick="aumentar('${c.id}',null)">Aumentar orçamento</button>
-      <button class="b o s" onclick="estancar('${c.id}',null)">Estancar campanha</button></div>`:''}</div>`));
+      <button class="b d s" onclick="estancar('${c.id}',null)">Cancelar campanha</button></div>`:''}</div>`));
 
   m.appendChild(el(`<div class="card"><h2>Itens</h2><div class="tw"><table>
     <tr><th>Item</th><th class="n">Preço</th><th class="n">Verba un.</th><th class="n">Margem un.</th><th>Vigência</th>
@@ -854,8 +965,8 @@ function painelCampanha(m,c){
             <div class="small">${fmtR(x.verba)} de ${fmtR(it.orcamento)}</div>`:'<span class="small">sem teto próprio</span>'}</td>
         <td class="n">${fmt(x.un)}</td><td>${statusTag(it.status)}</td>
         <td style="white-space:nowrap">${it.status==='suspenso_orcamento'
-          ?`<button class="b s" onclick="aumentar('${c.id}','${it.id}')">Aumentar</button> <button class="b s d" onclick="estancar('${c.id}','${it.id}')">Estancar</button>`
-          :it.status==='aprovado'?`<button class="b s o" onclick="aumentar('${c.id}','${it.id}')">+ orçam.</button> <button class="b s o" onclick="estancar('${c.id}','${it.id}')">Estancar</button>`:''}</td></tr>`}).join('')}
+          ?`<button class="b s" onclick="aumentar('${c.id}','${it.id}')">Aumentar</button> <button class="b s d" onclick="estancar('${c.id}','${it.id}')">Cancelar</button>`
+          :it.status==='aprovado'?`<button class="b s o" onclick="aumentar('${c.id}','${it.id}')">+ orçam.</button> <button class="b s o" onclick="estancar('${c.id}','${it.id}')">Cancelar promoção</button>`:''}</td></tr>`}).join('')}
   </table></div></div>`));
 
   if(c.eventos?.length) m.appendChild(el(`<div class="card"><h2>Histórico</h2>
@@ -880,11 +991,75 @@ function aumentar(cid,iid){
 }
 function estancar(cid,iid){
   const c=camp(cid), it=iid?c.itens.find(i=>i.id===iid):null;
-  if(!confirm(it?`Estancar a promoção de "${it.desc}"?`:`Estancar a campanha "${c.nome}"? Todas as promoções serão desfeitas.`)) return;
-  if(it){ it.status='estancado'; ev(c,it,'estancar','Promoção do item estancada.') }
+  if(!confirm(it?`Cancelar a promoção de "${it.desc}"? O preço volta ao normal e a placa sai do Placas.`
+                :`Cancelar a campanha "${c.nome}"? Todas as promoções são desfeitas e as placas saem do Placas.`)) return;
+  if(it){ it.status='estancado'; ev(c,it,'cancelamento','Promoção do item cancelada.'); tirarPlacas(c,[it.ean]) }
   else { c.status='estancada'; c.itens.forEach(i=>{if(['aprovado','suspenso_orcamento'].includes(i.status))i.status='estancado'});
-         ev(c,null,'estancar','Campanha estancada.') }
+         ev(c,null,'cancelamento','Campanha cancelada — promoções desfeitas.'); tirarPlacas(c) }
   save(); dbSyncCamp(c); render();
+}
+
+/* ---------------- placas: manda as promoções aceitas para o app Placas ---------------- */
+const PLACAS_URL='https://luciano504.github.io/placas/';
+async function enviarPlacas(cid){
+  const c=camp(cid);
+  const itens=c.itens.filter(i=>i.status==='aprovado');
+  if(!itens.length) return alert('Nenhum item aprovado nesta campanha.');
+  if(!ONLINE) return alert('Sem conexão com o banco.');
+  if(!confirm(`Mandar ${itens.length} item(ns) x ${c.lojas.length} loja(s) para o app Placas?\n\nEtiqueta: Parceria · vigência ${dbr(c.inicio)} a ${dbr(c.fim)}.\nDepois é só abrir o Placas, escolher a loja e imprimir.`)) return;
+  loading(true);
+  try{
+    // o Placas trabalha com o codigo do produto (id_produto do VR), não com o EAN
+    const eans=itens.map(i=>i.ean), mapa={};
+    for(let i=0;i<eans.length;i+=150){
+      const parte=eans.slice(i,i+150).map(e=>'"'+e+'"').join(',');
+      (await sb(`catalogo?select=ean,id_produto&ean=in.(${parte})`)).forEach(x=>{ if(x.id_produto) mapa[x.ean]=x.id_produto });
+    }
+    const semCodigo=itens.filter(i=>!mapa[i.ean]);
+    const semPreco=itens.filter(i=>mapa[i.ean]&&!(+i.preco>0&&+i.precoRef>0));
+    // a placa é do produto PAI: unidade e caixa do mesmo id_produto viram uma placa só
+    const porProduto={};
+    itens.forEach(it=>{ const cod=mapa[it.ean]; if(!cod) return;
+      if(!(+it.preco>0&&+it.precoRef>0)) return;                 // sem preço não vira placa
+      const atual=porProduto[cod];
+      if(!atual || String(it.ean).length<=13) porProduto[cod]=it; // prefere a unidade
+    });
+    const linhas=[];
+    Object.entries(porProduto).forEach(([cod,it])=>{
+      c.lojas.forEach(l=>linhas.push({camp:'parceria', loja:parseInt(l.replace(/\D/g,''),10),
+        codigo:+cod, descricao:(it.desc||'').slice(0,120), secao:(it.secao||'OUTROS').toUpperCase(),
+        de:+(+it.precoRef).toFixed(2), por:+(+it.preco).toFixed(2),
+        obs:fornNome(c.fornKey).slice(0,40), inicio:it.inicio||c.inicio, fim:it.fim||c.fim, pendente:false}));
+    });
+    if(!linhas.length) throw new Error('nenhum item com código do VR e preço para gerar placa');
+    for(let i=0;i<linhas.length;i+=200)
+      await sbPost('campanhas_placas',linhas.slice(i,i+200),'return=minimal');
+    ev(c,null,'placas',`${linhas.length} placa(s) enviadas ao app Placas (etiqueta Parceria).`);
+    save();
+    alert(`Pronto: ${linhas.length} placa(s) no app Placas (${Object.keys(porProduto).length} produtos x ${c.lojas.length} lojas)`
+      +(semCodigo.length?`\n${semCodigo.length} item(ns) sem código do VR ficaram de fora.`:'')
+      +(semPreco.length?`\n${semPreco.length} item(ns) sem preço ficaram de fora.`:'')
+      +`\n\nAbra o Placas, escolha a loja e imprima.`);
+    window.open(PLACAS_URL,'_blank');
+  }catch(e){ alert('Não consegui enviar: '+e.message) }
+  finally{ loading(false) }
+}
+async function tirarPlacas(c,eans){
+  // cancelou a promoção -> a placa sai do Placas
+  if(!ONLINE) return;
+  try{
+    const alvo=(eans||c.itens.map(i=>i.ean));
+    const mapa=[];
+    for(let i=0;i<alvo.length;i+=150){
+      const parte=alvo.slice(i,i+150).map(e=>'"'+e+'"').join(',');
+      (await sb(`catalogo?select=id_produto&ean=in.(${parte})`)).forEach(x=>{ if(x.id_produto) mapa.push(x.id_produto) });
+    }
+    if(!mapa.length) return;
+    for(let i=0;i<mapa.length;i+=100){
+      await fetch(`${CFG.url}/rest/v1/campanhas_placas?camp=eq.parceria&inicio=eq.${c.inicio}&codigo=in.(${mapa.slice(i,i+100).join(',')})`,
+        {method:'DELETE',headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key,Prefer:'return=minimal'}});
+    }
+  }catch(e){ console.warn('tirar placas:',e.message) }
 }
 
 /* ---------------- aprovações ---------------- */
@@ -901,7 +1076,7 @@ function vAprov(m){
       <div class="row">
         <div><label>Início</label><input type="date" id="g_i_${c.id}" value="${c.inicio}"></div>
         <div><label>Fim</label><input type="date" id="g_f_${c.id}" value="${c.fim}"></div>
-        <div><label>Orçamento total (R$)</label><input type="number" step="0.01" id="g_o_${c.id}" value="${c.orcamento}"></div>
+        <div><label>Orçamento total (R$)</label><input type="text" inputmode="decimal" id="g_o_${c.id}" value="${fmt(c.orcamento)}"></div>
         <div style="flex:1 1 200px"><label>Pagamento</label><select onchange="camp('${c.id}').pagamento=this.value;save();render()">
           <option value="pos" ${c.pagamento!=='antecipado'?'selected':''}>Após a apuração</option>
           <option value="antecipado" ${c.pagamento==='antecipado'?'selected':''}>Antecipado</option></select></div></div>
@@ -959,7 +1134,7 @@ function lerAprov(c,it){
 }
 function lerGeral(c){ const g=p=>document.getElementById(p+c.id);
   if(g('g_i_')){ c.inicio=g('g_i_').value||c.inicio; c.fim=g('g_f_').value||c.fim;
-                 c.orcamento=+g('g_o_').value||c.orcamento } }
+                 c.orcamento=valorBR(g('g_o_').value)||c.orcamento } }
 function contra(cid,iid){ const c=camp(cid), it=c.itens.find(i=>i.id===iid);
   lerGeral(c); const dif=lerAprov(c,it); ev(c,it,'alteracao_gestor',dif||'sem alterações');
   save(); dbSyncCamp(c); render(); alert('Alteração salva. O item continua aguardando aceite.'); }
