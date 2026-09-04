@@ -627,8 +627,12 @@ function vNova(m){
   m.appendChild(el(`<div class="card"><h2>1 · Dados da campanha</h2>
     ${g?`<div class="row" style="margin-bottom:10px">
       <div style="flex:2 1 320px"><label>Fornecedor (razão social aglutinada)</label>
-        <select onchange="trocaForn(this.value)">${ordForn().map(f=>
-          `<option value="${f.key}" ${f.key===d.fornKey?'selected':''}>${S.principais.includes(f.key)?'★ ':''}${f.nome}${f.ids.length>1?` (${f.ids.length} CNPJs)`:''}</option>`).join('')}</select>
+        <input id="bForn" value="${(S.buscaForn||'').replace(/"/g,'&quot;')}" placeholder="Buscar por nome ou pelo código interno do VR (ex.: 13854)"
+               oninput="S.buscaForn=this.value;save();render();setTimeout(()=>{const c=document.getElementById('bForn');if(c){c.focus();c.setSelectionRange(c.value.length,c.value.length)}},0)"
+               style="margin-bottom:6px">
+        <select onchange="trocaForn(this.value)">${fornFiltrados(d.fornKey).map(f=>
+          `<option value="${f.key}" ${f.key===d.fornKey?'selected':''}>${S.principais.includes(f.key)?'★ ':''}${f.nome} · cód ${f.ids.join('/')}${f.ids.length>1?` (${f.ids.length} CNPJs)`:''}</option>`).join('')}</select>
+        <div class="small" style="margin-top:4px">${fornFiltrados(d.fornKey).length} de ${FORN.length} fornecedores${S.buscaForn?` · <a href="#" onclick="S.buscaForn='';save();render();return false">limpar busca</a>`:''}</div>
         <div class="small" style="margin-top:4px">${disp.filter(p=>p.ativo!==false).length} SKUs ativos de ${disp.length} · id_fornecedor: ${(FORN.find(f=>f.key===d.fornKey)||{ids:[]}).ids.join(', ')}
           <label style="display:inline-flex;gap:4px;align-items:center;margin-left:8px;font-size:12px">
             <input type="checkbox" ${S.soAtivos===false?'checked':''} onchange="S.soAtivos=!this.checked;save();render()"> mostrar inativos</label></div></div>
@@ -707,6 +711,21 @@ function vNova(m){
       DRAFT[k]=id==='nOrc'?valorBR(e.value):e.value;
       if(id==='nOrc'){ const kpi=document.getElementById('kpiOrc'); if(kpi) kpi.textContent=fmtR(DRAFT.orcamento) } }});
   if(!('BarcodeDetector' in window)){const b=document.getElementById('btScan'); if(b){b.disabled=true;b.title='Precisa de HTTPS e navegador compatível'}}
+}
+const semAcento=s=>String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase();
+/* busca de fornecedor: casa pela razão social OU pelo código interno do VR.
+   O selecionado nunca some da lista, senão o <select> perderia o valor. */
+function fornFiltrados(atual){
+  const q=semAcento(S.buscaForn).trim();
+  const lista=ordForn();
+  if(!q) return lista;
+  const dig=q.replace(/\D/g,'');
+  const bate=f=> semAcento(f.nome).includes(q)
+    || (dig && f.ids.some(i=>String(i).includes(dig)))
+    || (f.cnpjs||[]).some(c=>dig && String(c).replace(/\D/g,'').includes(dig));
+  const r=lista.filter(bate);
+  if(atual && !r.some(f=>f.key===atual)){ const a=lista.find(f=>f.key===atual); if(a) r.unshift(a) }
+  return r;
 }
 function ordForn(){ return [...FORN].sort((a,b)=>
   (S.principais.includes(b.key)?1:0)-(S.principais.includes(a.key)?1:0)||a.nome.localeCompare(b.nome)) }
