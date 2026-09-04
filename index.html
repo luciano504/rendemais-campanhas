@@ -338,16 +338,36 @@ async function itensDoForn(fk){
   const f=FORN.find(x=>x.key===fk); if(!f) return [];
   loading(true);
   try{
+    const m={};
+    // ---- 1. BASE COMPLETA DO VR: todo item ativo do fornecedor (vr_itens) ----
+    if(f.ids.length){
+      try{
+        const vi=await sbPag(`vr_itens?select=id_produto,ean,loja,custo,preco,estoque,vmd,id_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',60000);
+        const ids=[...new Set(vi.map(x=>x.id_produto).filter(Boolean))];
+        const meta={};
+        for(let i=0;i<ids.length;i+=400){
+          (await sb(`vr_produtos?select=id_produto,ean,descricao,secao&id_produto=in.(${ids.slice(i,i+400).join(',')})`))
+            .forEach(p=>meta[p.id_produto]=p);
+        }
+        vi.forEach(r=>{
+          const mp=meta[r.id_produto]||{}, ean=r.ean||mp.ean; if(!ean) return;
+          const it=m[ean]||(m[ean]={ean:String(ean),desc:mp.descricao||String(ean),
+            secao:mp.secao||'(sem seção)',idf:r.id_fornecedor,idProduto:r.id_produto,lojas:{}});
+          it.lojas[r.loja]={custo:+r.custo||0,preco:+r.preco||0,estoque:+r.estoque||0,vmd:+r.vmd||0};
+        });
+        if(vi.length) console.log(`vr_itens: ${Object.keys(m).length} SKUs do fornecedor.`);
+      }catch(e){ console.warn('vr_itens (base do VR):',e.message) }
+    }
+    // ---- 2. produtos_loja (Data Crítica): dado mais fresco dos itens acompanhados ----
     const pl = f.ids.length
       ? await sbPag(`produtos_loja?select=ean,loja,ultimo_custo,preco_venda,estoque,vmd14,id_fornecedor,nome_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',40000)
       : [];
-    const eans=[...new Set(pl.map(x=>x.ean))];
+    const novos=[...new Set(pl.map(x=>x.ean))].filter(e=>!m[e]);
     const descr={};
-    for(let i=0;i<eans.length;i+=300){
-      const parte=eans.slice(i,i+300).map(e=>`"${e}"`).join(',');
+    for(let i=0;i<novos.length;i+=300){
+      const parte=novos.slice(i,i+300).map(e=>`"${e}"`).join(',');
       (await sb(`produtos?select=ean,descricao,secao&ean=in.(${parte})`)).forEach(p=>descr[p.ean]=p);
     }
-    const m={};
     pl.forEach(r=>{
       const it=m[r.ean]||(m[r.ean]={ean:r.ean,desc:(descr[r.ean]||{}).descricao||r.ean,
         secao:(descr[r.ean]||{}).secao||'(sem seção)',idf:r.id_fornecedor,lojas:{}});
@@ -355,7 +375,7 @@ async function itensDoForn(fk){
     });
     // id_produto (produto PAI no VR) de cada EAN, para o diálogo pai/filho e para as placas
     try{
-      const todos=Object.keys(m);
+      const todos=Object.keys(m).filter(e=>!m[e].idProduto);
       for(let i=0;i<todos.length;i+=150){
         const parte=todos.slice(i,i+150).map(e=>'"'+e+'"').join(',');
         (await sb(`catalogo?select=ean,id_produto&ean=in.(${parte})`)).forEach(c=>{ if(m[c.ean]) m[c.ean].idProduto=c.id_produto });
