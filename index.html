@@ -209,9 +209,9 @@ async function conectar(){
         const absorvidas=m.chaves_absorvidas||[];
         // um cadastro só: soma os id_fornecedor das razões sociais agrupadas
         const idsAbs=FORN.filter(f=>absorvidas.includes(f.key)).flatMap(f=>f.ids);
-        const ids=[...new Set([...(m.ids_fornecedor||[]),...idsAbs])];
+        const ids=[...new Set([...(m.ids_fornecedor||[]),...idsAbs].map(Number).filter(Boolean))];
         const j=FORN.find(f=>f.key===m.fornecedor_chave);
-        if(j){ j.manual=true; j.cnpjs=m.cnpjs; j.ids=[...new Set([...j.ids,...ids])]; j.absorvidas=absorvidas }
+        if(j){ j.manual=true; j.cnpjs=m.cnpjs; j.ids=[...new Set([...j.ids.map(Number),...ids])]; j.absorvidas=absorvidas }
         else FORN.push({key:m.fornecedor_chave,nome:m.nome,ids,cnpjs:m.cnpjs||[],manual:true,absorvidas});
         if(absorvidas.length){                       // as razões sociais somem da lista
           FORN=FORN.filter(f=>!(absorvidas.includes(f.key)&&f.key!==m.fornecedor_chave));
@@ -339,24 +339,20 @@ async function itensDoForn(fk){
   loading(true);
   try{
     const m={};
-    // ---- 1. BASE COMPLETA DO VR: todo item ativo do fornecedor (vr_itens) ----
+    // ---- 1. BASE ATIVA DO FORNECEDOR (catalogo_fornecedor, vinda do VR todo dia):
+    //         item cadastrado no fornecedor, com estoque na loja e venda nos últimos 90 dias ----
     if(f.ids.length){
       try{
-        const vi=await sbPag(`vr_itens?select=id_produto,ean,loja,custo,preco,estoque,vmd,id_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',60000);
-        const ids=[...new Set(vi.map(x=>x.id_produto).filter(Boolean))];
-        const meta={};
-        for(let i=0;i<ids.length;i+=400){
-          (await sb(`vr_produtos?select=id_produto,ean,descricao,secao&id_produto=in.(${ids.slice(i,i+400).join(',')})`))
-            .forEach(p=>meta[p.id_produto]=p);
-        }
-        vi.forEach(r=>{
-          const mp=meta[r.id_produto]||{}, ean=r.ean||mp.ean; if(!ean) return;
-          const it=m[ean]||(m[ean]={ean:String(ean),desc:mp.descricao||String(ean),
-            secao:mp.secao||'(sem seção)',idf:r.id_fornecedor,idProduto:r.id_produto,lojas:{}});
-          it.lojas[r.loja]={custo:+r.custo||0,preco:+r.preco||0,estoque:+r.estoque||0,vmd:+r.vmd||0};
+        const cf=await sbPag(`catalogo_fornecedor?select=ean,loja,descricao,secao,estoque,preco_venda,ultimo_custo,id_fornecedor&id_fornecedor=in.(${f.ids.join(',')})`,'',60000);
+        cf.forEach(r=>{
+          if(!r.ean) return;
+          const it=m[r.ean]||(m[r.ean]={ean:String(r.ean),desc:r.descricao||String(r.ean),
+            secao:r.secao||'(sem seção)',idf:r.id_fornecedor,giro:true,lojas:{}});
+          it.giro=true;
+          it.lojas[r.loja]={custo:+r.ultimo_custo||0,preco:+r.preco_venda||0,estoque:+r.estoque||0,vmd:0};
         });
-        if(vi.length) console.log(`vr_itens: ${Object.keys(m).length} SKUs do fornecedor.`);
-      }catch(e){ console.warn('vr_itens (base do VR):',e.message) }
+        if(cf.length) console.log(`catalogo_fornecedor: ${Object.keys(m).length} SKUs ativos.`);
+      }catch(e){ console.warn('catalogo_fornecedor:',e.message) }
     }
     // ---- 2. produtos_loja (Data Crítica): dado mais fresco dos itens acompanhados ----
     const pl = f.ids.length
@@ -396,7 +392,7 @@ async function itensDoForn(fk){
     }catch(e){ console.warn('itens manuais:',e.message) }
     Object.values(m).forEach(it=>{                 // SKU ativo = tem preço e (estoque ou giro)
       const ls=Object.values(it.lojas);
-      it.ativo = ls.some(l=>l.preco>0) && (ls.some(l=>l.estoque>0) || ls.some(l=>l.vmd>0) || it.manual);
+      it.ativo = ls.some(l=>l.preco>0) && (ls.some(l=>l.estoque>0) || ls.some(l=>l.vmd>0) || it.manual || it.giro);
     });
     CACHE.itens[fk]=Object.values(m).sort((a,b)=>a.desc.localeCompare(b.desc));
   }catch(e){ alert('Não consegui ler os itens: '+e.message); CACHE.itens[fk]=[] }
