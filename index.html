@@ -275,6 +275,7 @@ const itemPara=(it,campId)=>({campanha_id:campId,ean:it.ean,descricao:it.desc,se
   custo_ref:+it.custoRef||0,preco_ref:+it.precoRef||0,margem_alvo_ref:+it.alvoRef||0,status:it.status});
 
 async function dbCarregar(){
+  dbLancamentos().catch(()=>{});
   if(!DB) return;
   const fk=fornDoUsuario();
   const filtro=ehGestor()?'':`&fornecedor_chave=eq.${encodeURIComponent(fk||'-')}`;
@@ -548,10 +549,241 @@ function meter(cons,orc,label){
 }
 
 /* =====================================================================  RENDER  */
+/* ================= FINANCEIRO · conta corrente do fornecedor ================= */
+let LANC=[];
+const FORMAS={abatimento:'Abatimento em nota/boleto',deposito:'Depósito / crédito',
+              bonificacao:'Bonificação em mercadoria',ajuste:'Ajuste'};
+const CAMP_FIN=['vigente','suspensa_orcamento','suspenso_orcamento','encerrada','estancada'];
+const COBRAVEL=st=>!['aguardando_aceite','aguardando_fornecedor','recusado'].includes(st);
+async function dbLancamentos(){
+  if(!DB){ LANC=[]; return LANC }
+  try{ LANC=await sb('verba_lancamentos?select=*&order=data.asc') }
+  catch(e){ console.warn('lançamentos:',e.message); LANC=[] }
+  return LANC;
+}
+/* débito = verba que a campanha já gerou nas vendas reais do VR */
+function debitosDoForn(fk){
+  return S.campanhas.filter(c=>c.fornKey===fk&&CAMP_FIN.includes(c.status)).map(c=>{
+    const itens=c.itens.filter(i=>COBRAVEL(i.status)).map(i=>{ const x=consumoItem(c,i);
+      return {ean:i.ean,desc:i.desc,un:x.un,verba:+i.verba||0,total:x.verba} }).filter(i=>i.un>0);
+    return {id:c.id,nome:c.nome,inicio:c.inicio,fim:c.fim,pagamento:c.pagamento,status:c.status,itens,
+      un:itens.reduce((a,i)=>a+i.un,0), total:itens.reduce((a,i)=>a+i.total,0)};
+  }).filter(c=>c.total>0.004).sort((a,b)=>a.inicio<b.inicio?-1:1);
+}
+function contaCorrente(fk){
+  const deb=debitosDoForn(fk);
+  const cre=LANC.filter(l=>l.fornecedor_chave===fk).sort((a,b)=>String(a.data)<String(b.data)?-1:1);
+  const D=deb.reduce((a,c)=>a+c.total,0);
+  const C=cre.reduce((a,l)=>a+(l.tipo==='debito'?-(+l.valor||0):(+l.valor||0)),0);
+  return {deb,cre,debito:D,credito:C,saldo:D-C};
+}
+function fornsComConta(){
+  const ks=[...new Set([...S.campanhas.filter(c=>CAMP_FIN.includes(c.status)).map(c=>c.fornKey),
+                        ...LANC.map(l=>l.fornecedor_chave)])];
+  return ks.map(k=>({key:k,nome:fornNome(k),...contaCorrente(k)}))
+           .filter(x=>Math.abs(x.debito)>0.004||Math.abs(x.credito)>0.004)
+           .sort((a,b)=>b.saldo-a.saldo);
+}
+function vFin(m){
+  if(DB&&!S._lancOk){ S._lancOk=true; dbLancamentos().then(render); }
+  return S.finForn?vFinExtrato(m,S.finForn):vFinLista(m);
+}
+function vFinLista(m){
+  const L=fornsComConta();
+  const tD=L.reduce((a,x)=>a+x.debito,0), tC=L.reduce((a,x)=>a+x.credito,0);
+  m.appendChild(el(`<div class="card"><h2>Conta corrente de verba</h2>
+    <div class="small">O que cada fornecedor já gerou de verba nas vendas reais, o que já pagou e o saldo a cobrar.</div>
+    <div class="kpi" style="margin-top:10px">
+      <div><span>Fornecedores com movimento</span><b>${L.length}</b></div>
+      <div><span>Verba apurada</span><b>${fmtR(tD)}</b></div>
+      <div><span>Pago / abatido</span><b>${fmtR(tC)}</b></div>
+      <div><span>Saldo a cobrar</span><b style="color:${tD-tC>0.004?'var(--crit)':'var(--good)'}">${fmtR(tD-tC)}</b></div></div>
+    ${L.length?`<div class="tw" style="margin-top:10px"><table>
+      <tr><th>Fornecedor</th><th class="n">Campanhas</th><th class="n">Verba apurada</th>
+          <th class="n">Pago / abatido</th><th class="n">Saldo</th><th></th></tr>
+      ${L.map(x=>`<tr><td><b>${x.nome}</b></td><td class="n">${x.deb.length}</td>
+        <td class="n">${fmtR(x.debito)}</td><td class="n">${fmtR(x.credito)}</td>
+        <td class="n" style="font-weight:700;color:${x.saldo>0.004?'var(--crit)':x.saldo<-0.004?'var(--warn)':'var(--good)'}">${fmtR(x.saldo)}</td>
+        <td><button class="b s o" onclick="abrirConta('${String(x.key).replace(/'/g,"\\'")}')">Extrato</button></td></tr>`).join('')}
+      </table></div>`:'<p class="small" style="margin-top:10px">Nenhuma campanha aceita gerou verba ainda.</p>'}
+  </div>`));
+}
+function abrirConta(fk){ S.finForn=fk; S.finLanc=false; save(); render(); window.scrollTo(0,0) }
+function vFinExtrato(m,fk){
+  const cc=contaCorrente(fk), nome=fornNome(fk);
+  const fkJS=String(fk).replace(/'/g,"\\'");
+  m.appendChild(el(`<div class="card">
+    <div class="hd"><div><h2 style="margin:0">${nome}</h2>
+      <div class="small">Conta corrente de verba de fomento</div></div>
+      <button class="b o s" onclick="S.finForn='';save();render()">← Todos</button></div>
+    <div class="kpi" style="margin-top:10px">
+      <div><span>Verba apurada</span><b>${fmtR(cc.debito)}</b></div>
+      <div><span>Pago / abatido</span><b>${fmtR(cc.credito)}</b></div>
+      <div><span>Saldo a cobrar</span><b style="color:${cc.saldo>0.004?'var(--crit)':'var(--good)'}">${fmtR(cc.saldo)}</b></div></div>
+    <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="b" onclick="pdfExtrato('${fkJS}')">📄 Gerar PDF da cobrança</button>
+      <button class="b o" onclick="S.finLanc=!S.finLanc;render()">💰 Registrar pagamento</button></div>
+    ${S.finLanc?`<div class="alert" style="margin-top:12px">
+      <b>Baixa na conta corrente</b>
+      <div class="row" style="margin-top:8px">
+        <div style="flex:1 1 180px"><label>Forma</label><select id="lcForma">
+          ${Object.entries(FORMAS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></div>
+        <div style="flex:1 1 140px"><label>Valor (R$)</label>
+          <input id="lcValor" inputmode="decimal" placeholder="0,00"></div>
+        <div style="flex:1 1 140px"><label>Data</label><input type="date" id="lcData" value="${hoje()}"></div>
+        <div style="flex:1 1 160px"><label>Documento (NF, boleto)</label><input id="lcDoc" placeholder="ex.: NF 12345"></div>
+        <div style="flex:1 1 200px"><label>Campanha (opcional)</label><select id="lcCamp">
+          <option value="">Todas / geral</option>
+          ${cc.deb.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
+        <div style="flex:2 1 220px"><label>Observação</label><input id="lcObs" placeholder="opcional"></div></div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="b" onclick="salvarLancamento('${fkJS}')">Lançar</button>
+        <button class="b o" onclick="S.finLanc=false;render()">Cancelar</button></div></div>`:''}
+  </div>`));
+  m.appendChild(el(`<div class="card"><h2>Verba apurada por campanha</h2>
+    ${cc.deb.length?`<div class="tw"><table>
+      <tr><th>Campanha</th><th>Vigência</th><th class="n">Itens</th><th class="n">Unidades</th>
+          <th class="n">Verba</th><th>Pagamento</th></tr>
+      ${cc.deb.map(c=>`<tr><td><b>${c.nome}</b> ${statusTag(c.status)}</td>
+        <td class="small">${dbr(c.inicio)} a ${dbr(c.fim)}</td><td class="n">${c.itens.length}</td>
+        <td class="n">${fmt(c.un)}</td><td class="n"><b>${fmtR(c.total)}</b></td>
+        <td class="small">${c.pagamento==='antecipado'?'antecipado':'após apuração'}</td></tr>`).join('')}
+      <tr><td colspan="4" style="text-align:right"><b>Total apurado</b></td>
+          <td class="n"><b>${fmtR(cc.debito)}</b></td><td></td></tr>
+      </table></div>`:'<p class="small">Nenhuma campanha gerou verba ainda.</p>'}</div>`));
+  m.appendChild(el(`<div class="card"><h2>Pagamentos e abatimentos</h2>
+    ${cc.cre.length?`<div class="tw"><table>
+      <tr><th>Data</th><th>Forma</th><th>Documento</th><th>Campanha</th><th class="n">Valor</th><th></th></tr>
+      ${cc.cre.map(l=>`<tr><td class="small">${dbr(l.data)}</td>
+        <td>${FORMAS[l.forma]||l.forma||'—'}${l.tipo==='debito'?' <span class="tag bad">estorno</span>':''}</td>
+        <td class="small">${l.documento||'—'}${l.observacao?'<div class="small">'+l.observacao+'</div>':''}</td>
+        <td class="small">${(cc.deb.find(c=>String(c.id)===String(l.campanha_id))||{}).nome||'geral'}</td>
+        <td class="n">${l.tipo==='debito'?'−':''}${fmtR(l.valor)}</td>
+        <td>${l.tipo!=='debito'?`<button class="b s o" onclick="estornar(${l.id},'${fkJS}')">estornar</button>`:''}</td></tr>`).join('')}
+      <tr><td colspan="4" style="text-align:right"><b>Total pago</b></td>
+          <td class="n"><b>${fmtR(cc.credito)}</b></td><td></td></tr>
+      </table></div>`:'<p class="small">Nenhum pagamento lançado.</p>'}</div>`));
+}
+async function salvarLancamento(fk){
+  const g=id=>document.getElementById(id);
+  const valor=valorBR(g('lcValor').value);
+  if(!(valor>0)) return alert('Informe o valor do pagamento.');
+  const reg={fornecedor_chave:fk, campanha_id:g('lcCamp').value?+g('lcCamp').value:null,
+    tipo:'credito', forma:g('lcForma').value, documento:g('lcDoc').value.trim()||null,
+    valor:+valor.toFixed(2), data:g('lcData').value||hoje(),
+    observacao:g('lcObs').value.trim()||null,
+    criado_por:idUsuarioBanco(), criado_por_nome:usuario()?.nome||null};
+  loading(true);
+  try{ await sbPost('verba_lancamentos',reg,'return=minimal'); await dbLancamentos() }
+  catch(e){ loading(false); return alert('Não consegui gravar o lançamento: '+e.message) }
+  loading(false); S.finLanc=false; save(); render();
+}
+async function estornar(id,fk){
+  const l=LANC.find(x=>String(x.id)===String(id)); if(!l) return;
+  if(!confirm('Estornar o lançamento de '+fmtR(l.valor)+'? Ele deixa de abater o saldo.')) return;
+  loading(true);
+  try{ await sbPost('verba_lancamentos',{fornecedor_chave:fk,campanha_id:l.campanha_id,tipo:'debito',
+        forma:l.forma,documento:l.documento,valor:l.valor,data:hoje(),
+        observacao:'estorno do lançamento #'+id,criado_por:idUsuarioBanco(),
+        criado_por_nome:usuario()?.nome||null},'return=minimal');
+       await dbLancamentos() }
+  catch(e){ loading(false); return alert('Não consegui estornar: '+e.message) }
+  loading(false); render();
+}
+/* ---------------- PDF da cobrança ---------------- */
+async function carregarJsPDF(){
+  if(window.jspdf&&window.jspdf.jsPDF) return window.jspdf.jsPDF;
+  await new Promise((ok,err)=>{ const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+    s.onload=ok; s.onerror=()=>err(new Error('não consegui baixar o gerador de PDF'));
+    document.head.appendChild(s) });
+  return window.jspdf.jsPDF;
+}
+async function pdfExtrato(fk){
+  loading(true);
+  try{
+    const jsPDF=await carregarJsPDF();
+    const cc=contaCorrente(fk), nome=fornNome(fk);
+    const ids=(FORN.find(f=>f.key===fk)||{ids:[]}).ids||[];
+    const doc=new jsPDF({unit:'mm',format:'a4'});
+    const W=210, ML=14, MR=196; let y=0;
+    const cab=()=>{ doc.setFillColor(24,79,149); doc.rect(0,0,W,22,'F');
+      doc.setTextColor(255); doc.setFont('helvetica','bold'); doc.setFontSize(13);
+      doc.text('RENDE MAIS SUPERMERCADOS',ML,10);
+      doc.setFont('helvetica','normal'); doc.setFontSize(9);
+      doc.text('Demonstrativo de verba de fomento — conta corrente do fornecedor',ML,16);
+      doc.setTextColor(0); y=30; };
+    const pag=()=>{ const n=doc.internal.getNumberOfPages();
+      doc.setFontSize(7); doc.setTextColor(120);
+      doc.text('Valores apurados sobre a venda real registrada no VR Controller · app Rende Mais Campanhas',ML,289);
+      doc.text('pág. '+n,MR,289,{align:'right'}); doc.setTextColor(0); };
+    const quebra=h=>{ if(y+h>280){ pag(); doc.addPage(); cab() } };
+    const linha=(cols,larg,alin,neg,tam)=>{ quebra(6); doc.setFont('helvetica',neg?'bold':'normal');
+      doc.setFontSize(tam||8.5); let x=ML;
+      cols.forEach((c,i)=>{ const a=(alin||[])[i]||'left';
+        doc.text(String(c),a==='right'?x+larg[i]:x,y,{align:a==='right'?'right':'left',maxWidth:larg[i]-1});
+        x+=larg[i] });
+      y+=5; };
+    cab();
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.text(nome,ML,y); y+=6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor(90);
+    doc.text('Código do fornecedor no VR: '+(ids.join(', ')||'—')+'   ·   Emitido em '+
+             new Date().toLocaleDateString('pt-BR')+' às '+new Date().toLocaleTimeString('pt-BR').slice(0,5),ML,y);
+    doc.setTextColor(0); y+=9;
+    doc.setFillColor(244,244,241); doc.rect(ML,y-4,MR-ML,16,'F');
+    doc.setFontSize(9);
+    doc.text('Verba apurada',ML+3,y+1); doc.text('Pago / abatido',ML+62,y+1); doc.text('SALDO A PAGAR',ML+124,y+1);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text(fmtR(cc.debito),ML+3,y+8); doc.text(fmtR(cc.credito),ML+62,y+8);
+    doc.setTextColor(cc.saldo>0.004?190:12,cc.saldo>0.004?40:120,40);
+    doc.text(fmtR(cc.saldo),ML+124,y+8); doc.setTextColor(0); y+=22;
+    for(const c of cc.deb){
+      quebra(20);
+      doc.setFont('helvetica','bold'); doc.setFontSize(10);
+      doc.text(c.nome,ML,y); y+=5;
+      doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(90);
+      doc.text('Vigência '+dbr(c.inicio)+' a '+dbr(c.fim)+'   ·   '+c.itens.length+' itens   ·   '+
+               fmt(c.un)+' unidades vendidas   ·   pagamento '+(c.pagamento==='antecipado'?'antecipado':'após a apuração'),ML,y);
+      doc.setTextColor(0); y+=6;
+      const larg=[26,86,20,22,28], alin=['left','left','right','right','right'];
+      doc.setDrawColor(220); doc.line(ML,y-3.5,MR,y-3.5);
+      linha(['EAN','Item','Unid.','Verba un.','Verba total'],larg,alin,true,8);
+      doc.line(ML,y-3.5,MR,y-3.5);
+      c.itens.sort((a,b)=>b.total-a.total).forEach(i=>
+        linha([i.ean,(i.desc||'').slice(0,52),fmt(i.un),fmt(i.verba),fmtR(i.total)],larg,alin,false,8));
+      doc.line(ML,y-3.5,MR,y-3.5);
+      linha(['','Total da campanha','',fmt(c.un)+' un.',fmtR(c.total)],larg,alin,true,8.5);
+      y+=4;
+    }
+    if(cc.cre.length){
+      quebra(20); doc.setFont('helvetica','bold'); doc.setFontSize(10);
+      doc.text('Pagamentos e abatimentos lançados',ML,y); y+=6;
+      const larg=[22,52,52,28,28], alin=['left','left','left','left','right'];
+      doc.setDrawColor(220); doc.line(ML,y-3.5,MR,y-3.5);
+      linha(['Data','Forma','Documento','Campanha','Valor'],larg,alin,true,8);
+      doc.line(ML,y-3.5,MR,y-3.5);
+      cc.cre.forEach(l=>linha([dbr(l.data),(FORMAS[l.forma]||l.forma||'—')+(l.tipo==='debito'?' (estorno)':''),
+        (l.documento||'—'),((cc.deb.find(c=>String(c.id)===String(l.campanha_id))||{}).nome||'geral').slice(0,28),
+        (l.tipo==='debito'?'-':'')+fmtR(l.valor)],larg,alin,false,8));
+      doc.line(ML,y-3.5,MR,y-3.5);
+      linha(['','','','Total pago',fmtR(cc.credito)],larg,alin,true,8.5); y+=4;
+    }
+    quebra(16);
+    doc.setFillColor(24,79,149); doc.rect(ML,y-4,MR-ML,12,'F'); doc.setTextColor(255);
+    doc.setFont('helvetica','bold'); doc.setFontSize(11);
+    doc.text('SALDO A PAGAR',ML+3,y+4); doc.text(fmtR(cc.saldo),MR-3,y+4,{align:'right'});
+    doc.setTextColor(0);
+    pag();
+    doc.save('verba_'+nome.replace(/[^A-Za-z0-9]+/g,'_').slice(0,40)+'_'+hoje()+'.pdf');
+  }catch(e){ alert('Não consegui gerar o PDF: '+e.message) }
+  finally{ loading(false) }
+}
+
+
 function abas(){
   return ehGestor()
    ? [['aprov','Aprovações'],['nova','Nova campanha'],['painel','Painel'],['alertas','Alertas'],
-      ['forn','Fornecedores'],['rep','Representantes'],['cad','Seções e parâmetros'],['sim','Apuração / VR']]
+      ['forn','Fornecedores'],['rep','Representantes'],['cad','Seções e parâmetros'],['fin','Financeiro'],['sim','Apuração / VR']]
    : [['minhas','Minhas campanhas'],
       ...(minhasCamps().some(c=>c.status==='aguardando_fornecedor')?[['aprov','Propostas do Gestor']]:[]),
       ['nova','Nova campanha'],['acomp','Acompanhamento'],['alertas','Alertas']];
@@ -578,7 +810,7 @@ function render(){
     +(naoLidos()?`<button onclick="go('alertas')" style="color:var(--crit);font-weight:700">● ${naoLidos()}</button>`:'');
   const m=document.getElementById('app'); m.innerHTML='';
   ({minhas:vMinhas,nova:vNova,acomp:vAcomp,alertas:vAlertas,aprov:vAprov,painel:vPainel,
-    forn:vForn,rep:vRep,cad:vCad,sim:vSim}[VIEW]||vMinhas)(m);
+    forn:vForn,rep:vRep,cad:vCad,sim:vSim,fin:vFin}[VIEW]||vMinhas)(m);
 }
 function go(v){ VIEW=v; render(); window.scrollTo(0,0) }
 function naoLidos(){ const f=fornDoUsuario();
