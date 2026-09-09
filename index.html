@@ -584,8 +584,13 @@ function fornsComConta(){
            .filter(x=>Math.abs(x.debito)>0.004||Math.abs(x.credito)>0.004)
            .sort((a,b)=>b.saldo-a.saldo);
 }
+/* senha de confirmação do lançamento (guardada só como sha256; trocar aqui) */
+const SENHA_LANC='d260a1e0537c028e5478d65b3c8574664052a820b4eeb23a7b3a8c4ec2e5ade6';
+async function senhaOk(txt){ const h=await sha256(String(txt||'').trim()); return h===SENHA_LANC }
 function vFin(m){
   if(DB&&!S._lancOk){ S._lancOk=true; dbLancamentos().then(render); }
+  if(!ehGestor()){ const fk=fornDoUsuario();
+    return fk?vFinExtrato(m,fk):m.appendChild(el('<div class="card"><p class="small">Seu acesso ainda não está amarrado a um fornecedor.</p></div>')); }
   return S.finForn?vFinExtrato(m,S.finForn):vFinLista(m);
 }
 function vFinLista(m){
@@ -615,15 +620,15 @@ function vFinExtrato(m,fk){
   m.appendChild(el(`<div class="card">
     <div class="hd"><div><h2 style="margin:0">${nome}</h2>
       <div class="small">Conta corrente de verba de fomento</div></div>
-      <button class="b o s" onclick="S.finForn='';save();render()">← Todos</button></div>
+      ${ehGestor()?`<button class="b o s" onclick="S.finForn='';save();render()">← Todos</button>`:''}</div>
     <div class="kpi" style="margin-top:10px">
       <div><span>Verba apurada</span><b>${fmtR(cc.debito)}</b></div>
       <div><span>Pago / abatido</span><b>${fmtR(cc.credito)}</b></div>
       <div><span>Saldo a cobrar</span><b style="color:${cc.saldo>0.004?'var(--crit)':'var(--good)'}">${fmtR(cc.saldo)}</b></div></div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
-      <button class="b" onclick="pdfExtrato('${fkJS}')">📄 Gerar PDF da cobrança</button>
-      <button class="b o" onclick="S.finLanc=!S.finLanc;render()">💰 Registrar pagamento</button></div>
-    ${S.finLanc?`<div class="alert" style="margin-top:12px">
+      <button class="b" onclick="pdfExtrato('${fkJS}')">📄 ${ehGestor()?'Gerar PDF da cobrança':'Baixar meu extrato em PDF'}</button>
+      ${ehGestor()?`<button class="b o" onclick="S.finLanc=!S.finLanc;render()">💰 Registrar pagamento</button>`:''}</div>
+    ${(S.finLanc&&ehGestor())?`<div class="alert" style="margin-top:12px">
       <b>Baixa na conta corrente</b>
       <div class="row" style="margin-top:8px">
         <div style="flex:1 1 180px"><label>Forma</label><select id="lcForma">
@@ -635,7 +640,10 @@ function vFinExtrato(m,fk){
         <div style="flex:1 1 200px"><label>Campanha (opcional)</label><select id="lcCamp">
           <option value="">Todas / geral</option>
           ${cc.deb.map(c=>`<option value="${c.id}">${c.nome}</option>`).join('')}</select></div>
-        <div style="flex:2 1 220px"><label>Observação</label><input id="lcObs" placeholder="opcional"></div></div>
+        <div style="flex:2 1 220px"><label>Observação</label><input id="lcObs" placeholder="opcional"></div>
+        <div style="flex:1 1 180px"><label>Senha do gestor</label>
+          <input type="password" id="lcSenha" placeholder="confirmação" autocomplete="off"></div></div>
+      <div class="small" style="margin-top:6px">Fica registrado como lançado por <b>${usuario()?.nome||'—'}</b> em ${dbr(hoje())}.</div>
       <div style="margin-top:8px;display:flex;gap:8px">
         <button class="b" onclick="salvarLancamento('${fkJS}')">Lançar</button>
         <button class="b o" onclick="S.finLanc=false;render()">Cancelar</button></div></div>`:''}
@@ -656,7 +664,7 @@ function vFinExtrato(m,fk){
       <tr><th>Data</th><th>Forma</th><th>Documento</th><th>Campanha</th><th class="n">Valor</th><th></th></tr>
       ${cc.cre.map(l=>`<tr><td class="small">${dbr(l.data)}</td>
         <td>${FORMAS[l.forma]||l.forma||'—'}${l.tipo==='debito'?' <span class="tag bad">estorno</span>':''}</td>
-        <td class="small">${l.documento||'—'}${l.observacao?'<div class="small">'+l.observacao+'</div>':''}</td>
+        <td class="small">${l.documento||'—'}${l.observacao?'<div class="small">'+l.observacao+'</div>':''}${l.criado_por_nome?'<div class="small">por '+l.criado_por_nome+'</div>':''}</td>
         <td class="small">${(cc.deb.find(c=>String(c.id)===String(l.campanha_id))||{}).nome||'geral'}</td>
         <td class="n">${l.tipo==='debito'?'−':''}${fmtR(l.valor)}</td>
         <td>${l.tipo!=='debito'?`<button class="b s o" onclick="estornar(${l.id},'${fkJS}')">estornar</button>`:''}</td></tr>`).join('')}
@@ -665,9 +673,11 @@ function vFinExtrato(m,fk){
       </table></div>`:'<p class="small">Nenhum pagamento lançado.</p>'}</div>`));
 }
 async function salvarLancamento(fk){
+  if(!ehGestor()) return alert('Só o Gestor pode lançar pagamento.');
   const g=id=>document.getElementById(id);
   const valor=valorBR(g('lcValor').value);
   if(!(valor>0)) return alert('Informe o valor do pagamento.');
+  if(!await senhaOk(g('lcSenha').value)) return alert('Senha do gestor incorreta — nada foi gravado.');
   const reg={fornecedor_chave:fk, campanha_id:g('lcCamp').value?+g('lcCamp').value:null,
     tipo:'credito', forma:g('lcForma').value, documento:g('lcDoc').value.trim()||null,
     valor:+valor.toFixed(2), data:g('lcData').value||hoje(),
@@ -680,7 +690,9 @@ async function salvarLancamento(fk){
 }
 async function estornar(id,fk){
   const l=LANC.find(x=>String(x.id)===String(id)); if(!l) return;
+  if(!ehGestor()) return alert('Só o Gestor pode estornar.');
   if(!confirm('Estornar o lançamento de '+fmtR(l.valor)+'? Ele deixa de abater o saldo.')) return;
+  if(!await senhaOk(prompt('Senha do gestor para confirmar o estorno:'))) return alert('Senha incorreta — nada foi estornado.');
   loading(true);
   try{ await sbPost('verba_lancamentos',{fornecedor_chave:fk,campanha_id:l.campanha_id,tipo:'debito',
         forma:l.forma,documento:l.documento,valor:l.valor,data:hoje(),
@@ -763,7 +775,7 @@ async function pdfExtrato(fk){
       linha(['Data','Forma','Documento','Campanha','Valor'],larg,alin,true,8);
       doc.line(ML,y-3.5,MR,y-3.5);
       cc.cre.forEach(l=>linha([dbr(l.data),(FORMAS[l.forma]||l.forma||'—')+(l.tipo==='debito'?' (estorno)':''),
-        (l.documento||'—'),((cc.deb.find(c=>String(c.id)===String(l.campanha_id))||{}).nome||'geral').slice(0,28),
+        (l.documento||'—')+(l.criado_por_nome?' · '+l.criado_por_nome:''),((cc.deb.find(c=>String(c.id)===String(l.campanha_id))||{}).nome||'geral').slice(0,28),
         (l.tipo==='debito'?'-':'')+fmtR(l.valor)],larg,alin,false,8));
       doc.line(ML,y-3.5,MR,y-3.5);
       linha(['','','','Total pago',fmtR(cc.credito)],larg,alin,true,8.5); y+=4;
@@ -786,7 +798,7 @@ function abas(){
       ['forn','Fornecedores'],['rep','Representantes'],['cad','Seções e parâmetros'],['fin','Financeiro'],['sim','Apuração / VR']]
    : [['minhas','Minhas campanhas'],
       ...(minhasCamps().some(c=>c.status==='aguardando_fornecedor')?[['aprov','Propostas do Gestor']]:[]),
-      ['nova','Nova campanha'],['acomp','Acompanhamento'],['alertas','Alertas']];
+      ['nova','Nova campanha'],['acomp','Acompanhamento'],['fin','Meu extrato'],['alertas','Alertas']];
 }
 function render(){
   if(ONLINE&&!S.sessao) return telaLogin();
