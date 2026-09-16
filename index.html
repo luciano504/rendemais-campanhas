@@ -1117,41 +1117,61 @@ async function scanEAN(){
       requestAnimationFrame(loop)}; loop();
   }catch(e){ alert('Não consegui abrir a câmera: '+e.message) }
 }
-function itemForm(it){
+function itemDeriv(it){
   const pv=+it.preco||0, vb=+it.verba||0, alvo=alvoSecao(it.secao);
   const vs=verbaSugerida(it.precoRef,pv);
   const mg=margemCom(pv,it.custoRef,vb), mgRS=margemRS(pv,it.custoRef,vb);
-  const mgHoje=it.precoRef-it.custoRef;
+  const mgHoje=(+it.precoRef||0)-(+it.custoRef||0);
+  const ce=(+it.custoRef||0)-vb, mk=ce>0?mgRS/ce:null;          // markup sobre o custo já com a verba
   const menos=vb<vs-0.0001, abaixo=mg<alvo-0.0001;
+  const resumo=`Desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'} · Margem hoje <b>${fmtR(mgHoje)}</b> → com a verba `
+    +`<b style="color:${mgRS<mgHoje-0.0001?'var(--crit)':'var(--good)'}">${fmtR(mgRS)}</b> `
+    +`(${pct(mg)} de margem · markup ${mk!==null?pct(mk):'—'}) por unidade`;
+  const aviso=menos
+    ?`<div class="alert">🔴 <b>Verba abaixo da sugerida.</b> Com ${fmtR(vb)} (sugerido ${fmtR(vs)}) a margem cai de ${fmtR(mgHoje)} para <b>${fmtR(mgRS)}</b> (${pct(mg)}) — perda de ${fmtR(vs-vb)} por unidade vendida.</div>`
+    :(abaixo?`<div class="alert w">⚠️ Mesmo com a verba cheia a margem fica em ${pct(mg)}, abaixo do alvo de ${pct(alvo)} da seção ${it.secao}.</div>`:'');
+  return {pv,vb,alvo,vs,mg,mgRS,mgHoje,mk,menos,abaixo,resumo,aviso};
+}
+function itemForm(it){
+  const d=itemDeriv(it);
   const varia=it.precoMax&&it.precoMin&&it.precoMax-it.precoMin>0.001;
-  return `<div class="itembox ${menos?'bad':''}">
+  return `<div class="itembox ${d.menos?'bad':''}" id="itbox_${it.id}">
     <div class="hd"><div><b>${it.desc}</b>
-      <div class="small">${it.ean} · ${it.secao||'sem seção'} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)}${varia?` <span title="preços diferentes entre as lojas">(varia ${fmt(it.precoMin)}–${fmt(it.precoMax)})</span>`:''}</div></div>
+      <div class="small">${it.ean} · ${it.secao||'sem seção'} · alvo ${pct(d.alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)}${varia?` <span title="preços diferentes entre as lojas">(varia ${fmt(it.precoMin)}–${fmt(it.precoMax)})</span>`:''}</div></div>
       <button class="b s o" onclick="delItem('${it.id}')">remover</button></div>
     <div class="row" style="margin-top:9px">
-      <div><label>Preço de venda sugerido</label><input type="number" step="0.01" value="${it.preco}" oninput="setIt('${it.id}','preco',this.value)"></div>
-      <div><label title="Preço cheio − preço sugerido">Verba sugerida (R$)</label><input value="${fmt(vs)}" disabled></div>
+      <div><label>Preço de venda sugerido</label><input type="text" inputmode="decimal" id="itp_${it.id}" value="${fmt(it.preco)}" oninput="setIt('${it.id}','preco',this.value)"></div>
+      <div><label title="Preço cheio − preço sugerido">Verba sugerida (R$)</label><input id="itvs_${it.id}" value="${fmt(d.vs)}" disabled></div>
       <div><label>Verba unitária ofertada</label><div style="display:flex;gap:5px">
         <button class="b s o" onclick="stepVerba('${it.id}',-0.05)">−</button>
-        <input type="number" step="0.01" value="${it.verba}" oninput="setIt('${it.id}','verba',this.value)">
+        <input type="text" inputmode="decimal" id="itv_${it.id}" value="${fmt(it.verba)}" oninput="setIt('${it.id}','verba',this.value)">
         <button class="b s o" onclick="stepVerba('${it.id}',0.05)">+</button></div></div>
-      <div><label>Orçamento deste item (R$)</label><input type="number" step="0.01" value="${it.orcamento||''}" placeholder="sem teto próprio" oninput="setIt('${it.id}','orcamento',this.value)"></div>
+      <div><label>Orçamento deste item (R$)</label><input type="text" inputmode="decimal" id="ito_${it.id}" value="${it.orcamento?fmt(it.orcamento):''}" placeholder="sem teto próprio" oninput="setIt('${it.id}','orcamento',this.value)"></div>
       <div><label title="Em branco = segue o período da campanha">Início do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" value="${it.inicio||''}" oninput="setIt('${it.id}','inicio',this.value)"></div>
       <div><label title="Em branco = segue o período da campanha">Fim do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" value="${it.fim||''}" oninput="setIt('${it.id}','fim',this.value)"></div></div>
-    <div class="small" style="margin-top:6px">Desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'} ·
-      Margem hoje <b>${fmtR(mgHoje)}</b> → com a verba <b style="color:${mgRS<mgHoje-0.0001?'var(--crit)':'var(--good)'}">${fmtR(mgRS)}</b> (${pct(mg)}) por unidade</div>
-    ${menos?`<div class="alert">🔴 <b>Verba abaixo da sugerida.</b> Com ${fmtR(vb)} (sugerido ${fmtR(vs)}) a margem cai de ${fmtR(mgHoje)} para <b>${fmtR(mgRS)}</b> (${pct(mg)}) — perda de ${fmtR(vs-vb)} por unidade vendida.</div>`:''}
-    ${(!menos&&abaixo)?`<div class="alert w">⚠️ Mesmo com a verba cheia a margem fica em ${pct(mg)}, abaixo do alvo de ${pct(alvo)} da seção ${it.secao}.</div>`:''}</div>`;
+    <div class="small" style="margin-top:6px" id="itr_${it.id}">${d.resumo}</div>
+    <div id="ita_${it.id}">${d.aviso}</div></div>`;
+}
+/* redesenha só o que deriva do valor — nunca o campo que está sendo digitado */
+function pintaItem(it){
+  const d=itemDeriv(it), g=p=>document.getElementById(p+it.id);
+  const box=g('itbox_'); if(box) box.className='itembox '+(d.menos?'bad':'');
+  const vs=g('itvs_'); if(vs) vs.value=fmt(d.vs);
+  const r=g('itr_');  if(r) r.innerHTML=d.resumo;
+  const a=g('ita_');  if(a) a.innerHTML=d.aviso;
 }
 function setIt(id,k,v){
   const it=DRAFT.itens.find(i=>i.id===id); if(!it) return;
-  it[k]=(k==='inicio'||k==='fim')?v:(v===''?'':+v);
-  if(k==='preco'){ it.verbaSug=verbaSugerida(it.precoRef,+v||0); it.verba=it.verbaSug }
-  document.getElementById('itens').innerHTML=DRAFT.itens.map(itemForm).join('');
+  it[k]=(k==='inicio'||k==='fim')?v:(String(v).trim()===''?'':valorBR(v));
+  if(k==='preco'){ it.verbaSug=verbaSugerida(it.precoRef,+it.preco||0); it.verba=it.verbaSug;
+    const e=document.getElementById('itv_'+id);
+    if(e&&document.activeElement!==e) e.value=fmt(it.verba); }
+  pintaItem(it);
 }
-function stepVerba(id,d){ const it=DRAFT.itens.find(i=>i.id===id);
+function stepVerba(id,d){ const it=DRAFT.itens.find(i=>i.id===id); if(!it) return;
   it.verba=Math.max(0,+((+it.verba||0)+d).toFixed(2));
-  document.getElementById('itens').innerHTML=DRAFT.itens.map(itemForm).join(''); }
+  const e=document.getElementById('itv_'+id); if(e) e.value=fmt(it.verba);
+  pintaItem(it); }
 function delItem(id){ DRAFT.itens=DRAFT.itens.filter(i=>i.id!==id); render() }
 async function enviar(jaAcordada){
   const d=DRAFT, g=ehGestor();
@@ -1373,41 +1393,46 @@ function vAprov(m){
   });
 }
 function togLojaC(cid,l){ const c=camp(cid), i=c.lojas.indexOf(l); i<0?c.lojas.push(l):c.lojas.splice(i,1); save(); dbSyncCamp(c); render() }
+function aprovResumo(it,d){
+  return `Margem hoje <b>${fmtR(d.mgHoje)}</b> → com a verba `
+    +`<b style="color:${d.mgRS<d.mgHoje-.001?'var(--crit)':'var(--good)'}">${fmtR(d.mgRS)}</b> `
+    +`(${pct(d.mg)} de margem · markup ${d.mk!==null?pct(d.mk):'—'})`
+    +` · o teto do item paga ${it.orcamento&&d.vb?fmt(it.orcamento/d.vb)+' un.':'—'}`;
+}
 function aprovForm(c,it){
-  const pv=+it.preco||0, vb=+it.verba||0, alvo=alvoSecao(it.secao);
-  const vs=verbaSugerida(it.precoRef,pv);
-  const mg=margemCom(pv,it.custoRef,vb), mgRS=margemRS(pv,it.custoRef,vb), mgH=it.precoRef-it.custoRef;
-  const menos=vb<vs-0.0001, pend=it.status===stPend();
-  return `<div class="itembox ${menos?'bad':''}">
+  const d=itemDeriv(it), pend=it.status===stPend();
+  return `<div class="itembox ${d.menos?'bad':''}" id="apbox_${it.id}">
     <div class="hd"><div><b>${it.desc}</b> ${statusTag(it.status)}
-      <div class="small">${it.ean} · ${it.secao||'sem seção'} · alvo ${pct(alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)} · desconto ${it.precoRef?pct(1-pv/it.precoRef):'—'}</div></div></div>
+      <div class="small">${it.ean} · ${it.secao||'sem seção'} · alvo ${pct(d.alvo)} · custo ${fmtR(it.custoRef)} · preço cheio ${fmtR(it.precoRef)} · desconto ${it.precoRef?pct(1-d.pv/it.precoRef):'—'}</div></div></div>
     <div class="row" style="margin-top:8px">
-      <div><label>Preço promocional</label><input type="number" step="0.01" id="a_p_${it.id}" value="${it.preco}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
-      <div><label>Verba sugerida</label><input value="${fmt(vs)}" disabled></div>
-      <div><label>Verba unitária</label><input type="number" step="0.01" id="a_v_${it.id}" value="${it.verba}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
-      <div><label>Orçamento do item</label><input type="number" step="0.01" id="a_o_${it.id}" value="${it.orcamento||''}" ${pend?'':'disabled'}></div>
+      <div><label>Preço promocional</label><input type="text" inputmode="decimal" id="a_p_${it.id}" value="${fmt(it.preco)}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
+      <div><label>Verba sugerida</label><input id="a_s_${it.id}" value="${fmt(d.vs)}" disabled></div>
+      <div><label>Verba unitária</label><input type="text" inputmode="decimal" id="a_v_${it.id}" value="${fmt(it.verba)}" ${pend?'':'disabled'} oninput="reAprov('${c.id}','${it.id}')"></div>
+      <div><label>Orçamento do item</label><input type="text" inputmode="decimal" id="a_o_${it.id}" value="${it.orcamento?fmt(it.orcamento):''}" ${pend?'':'disabled'}></div>
       <div><label title="Em branco = segue o período da campanha">Início do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" id="a_i_${it.id}" value="${it.inicio||''}" ${pend?'':'disabled'}></div>
       <div><label title="Em branco = segue o período da campanha">Fim do item <span style="color:var(--muted)">(opcional)</span></label><input type="date" id="a_f_${it.id}" value="${it.fim||''}" ${pend?'':'disabled'}></div></div>
-    <div class="small" style="margin-top:6px">Margem hoje <b>${fmtR(mgH)}</b> → com a verba
-      <b style="color:${mgRS<mgH-.001?'var(--crit)':'var(--good)'}">${fmtR(mgRS)}</b> (${pct(mg)})
-      · o teto do item paga ${it.orcamento&&vb?fmt(it.orcamento/vb)+' un.':'—'}</div>
-    ${menos?`<div class="alert">🔴 Verba ${fmtR(vb)} abaixo da sugerida ${fmtR(vs)} — margem unitária cai de ${fmtR(mgH)} para ${fmtR(mgRS)}.</div>`:''}
+    <div class="small" style="margin-top:6px" id="apr_r_${it.id}">${aprovResumo(it,d)}</div>
+    <div id="apr_a_${it.id}">${d.menos?`<div class="alert">🔴 Verba ${fmtR(d.vb)} abaixo da sugerida ${fmtR(d.vs)} — margem unitária cai de ${fmtR(d.mgHoje)} para ${fmtR(d.mgRS)}.</div>`:''}</div>
     ${pend?`<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="b g s" onclick="decidir('${c.id}','${it.id}',true)">Aceitar item</button>
       <button class="b d s" onclick="decidir('${c.id}','${it.id}',false)">Recusar item</button>
       <button class="b o s" onclick="contra('${c.id}','${it.id}')">Salvar alteração (contraproposta)</button></div>`:''}</div>`;
 }
 function reAprov(cid,iid){
-  const c=camp(cid), it=c.itens.find(i=>i.id===iid);
-  it.preco=+document.getElementById('a_p_'+iid).value; it.verba=+document.getElementById('a_v_'+iid).value;
-  const act=document.activeElement?.id;
-  document.getElementById('apr_'+cid).innerHTML=c.itens.map(x=>aprovForm(c,x)).join('');
-  if(act){const e=document.getElementById(act); if(e){e.focus(); e.setSelectionRange?.(e.value.length,e.value.length)}}
+  const c=camp(cid), it=c.itens.find(i=>i.id===iid); if(!it) return;
+  const g=p=>document.getElementById(p+iid);
+  if(g('a_p_')) it.preco=valorBR(g('a_p_').value);
+  if(g('a_v_')) it.verba=valorBR(g('a_v_').value);
+  const d=itemDeriv(it);
+  const box=g('apbox_'); if(box) box.className='itembox '+(d.menos?'bad':'');
+  const vs=g('a_s_');    if(vs) vs.value=fmt(d.vs);
+  const r=g('apr_r_');   if(r) r.innerHTML=aprovResumo(it,d);
+  const a=g('apr_a_');   if(a) a.innerHTML=d.menos?`<div class="alert">🔴 Verba ${fmtR(d.vb)} abaixo da sugerida ${fmtR(d.vs)} — margem unitária cai de ${fmtR(d.mgHoje)} para ${fmtR(d.mgRS)}.</div>`:'';
 }
 function lerAprov(c,it){
   const g=p=>document.getElementById(p+it.id);
   const de={preco:it.preco,verba:it.verba,orcamento:it.orcamento,inicio:it.inicio,fim:it.fim};
-  if(g('a_p_')){ it.preco=+g('a_p_').value; it.verba=+g('a_v_').value; it.orcamento=+g('a_o_').value||0;
+  if(g('a_p_')){ it.preco=valorBR(g('a_p_').value); it.verba=valorBR(g('a_v_').value); it.orcamento=valorBR(g('a_o_').value)||0;
                  it.inicio=g('a_i_').value||''; it.fim=g('a_f_').value||''; }
   it.verbaSug=verbaSugerida(it.precoRef,it.preco);
   return Object.keys(de).filter(k=>String(de[k]||'')!==String(it[k]||'')).map(k=>`${k}: ${de[k]||'—'} → ${it[k]||'—'}`).join('; ');
@@ -1547,8 +1572,8 @@ function itensManuais(chave,eanPre){
       <div><label>EAN</label><input id="miEan" inputmode="numeric" value="${eanPre||''}"></div>
       <div style="flex:2 1 180px"><label>Descrição</label><input id="miDesc"></div>
       <div><label>Seção</label><input id="miSecao" placeholder="Mercearia"></div>
-      <div><label>Custo (R$)</label><input id="miCusto" type="number" step="0.01"></div>
-      <div><label>Preço cheio (R$)</label><input id="miPreco" type="number" step="0.01"></div>
+      <div><label>Custo (R$)</label><input id="miCusto" type="text" inputmode="decimal" placeholder="0,00"></div>
+      <div><label>Preço cheio (R$)</label><input id="miPreco" type="text" inputmode="decimal" placeholder="0,00"></div>
     </div>
     <div style="margin-top:10px;display:flex;gap:8px">
       <button class="b" onclick="addItemManual('${chave.replace(/'/g,"&#39;")}')">+ Adicionar item</button>
@@ -1564,7 +1589,7 @@ async function addItemManual(chave){
   const g=i=>document.getElementById(i).value.trim();
   const ean=soDig(g('miEan')); if(!ean) return alert('Informe o EAN.');
   const reg={fornecedor_chave:chave,ean,descricao:g('miDesc')||null,secao:g('miSecao')||null,
-    custo:+g('miCusto')||null,preco:+g('miPreco')||null,criado_por:idUsuarioBanco()};
+    custo:valorBR(g('miCusto'))||null,preco:valorBR(g('miPreco'))||null,criado_por:idUsuarioBanco()};
   if(!reg.descricao&&!DB) return alert('Informe a descrição.');
   if(DB){ try{ await sbPost('fornecedor_itens_manuais',reg,'return=minimal') }
           catch(e){ return alert('Não consegui gravar: '+e.message) } }
@@ -1647,12 +1672,12 @@ function vCad(m){
   m.appendChild(el(`<div class="card"><h2>Margem-alvo por seção</h2>
     <p class="small">A verba sugerida é <b>preço cheio − preço sugerido</b> (mantém a margem em R$). A margem-alvo abaixo é o <b>piso de referência</b>: se a margem ficar abaixo dela mesmo com a verba cheia, o app avisa. As seções vêm de <code>produtos.secao</code>.</p>
     <div class="tw"><table><tr><th>Seção</th><th class="n">Margem-alvo</th></tr>
-      ${secoes.map(s=>`<tr><td>${s}</td><td class="n"><input type="number" step="0.5" style="width:90px;text-align:right"
-        value="${(alvoSecao(s)*100).toFixed(1)}" onchange="S.secoes['${s.replace(/'/g,"\\'")}']=+this.value/100;save()"> %</td></tr>`).join('')
+      ${secoes.map(s=>`<tr><td>${s}</td><td class="n"><input type="text" inputmode="decimal" style="width:90px;text-align:right"
+        value="${fmt(alvoSecao(s)*100)}" onchange="S.secoes['${s.replace(/'/g,"\\'")}']=valorBR(this.value)/100;save()"> %</td></tr>`).join('')
         ||'<tr><td colspan="2" class="small">Carregue o portfólio de um fornecedor para as seções aparecerem.</td></tr>'}</table></div></div>`));
   m.appendChild(el(`<div class="card"><h2>Parâmetros</h2>
     <div class="row"><div><label>Alerta de consumo em (%)</label>
-      <input type="number" step="1" value="${(S.pctAlerta*100).toFixed(0)}" onchange="S.pctAlerta=+this.value/100;save();render()"></div>
+      <input type="text" inputmode="decimal" value="${fmt(S.pctAlerta*100)}" onchange="S.pctAlerta=valorBR(this.value)/100;save();render()"></div>
       <div style="flex:2 1 300px"><label>Supabase (mesmo projeto do Data Crítica)</label><input value="${CFG.url}" disabled></div></div>
     <div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="b o s" onclick="conectar().then(render)">Recarregar cadastro do VR</button>
