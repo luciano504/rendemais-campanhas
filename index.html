@@ -129,6 +129,7 @@ const fmt=n=>(+n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFrac
 const fmtR=n=>'R$ '+fmt(n);
 const pct=n=>((+n||0)*100).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%';
 const hoje=()=>S.hojeSim||new Date().toISOString().slice(0,10);
+const hbr=d=>{try{return new Date(d).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',timeZone:'America/Recife'})}catch(e){return String(d).slice(11,16)}};
 const dbr=d=>d?String(d).slice(0,10).split('-').reverse().join('/'):'—';
 const uid=()=>Math.random().toString(36).slice(2,9);
 const el=h=>{const d=document.createElement('div');d.innerHTML=h.trim();return d.firstChild};
@@ -158,6 +159,11 @@ async function sb(path,opts){
 }
 async function sbPag(path,campo,limite=50000){       // paginação por Range
   const out=[]; let de=0, passo=1000;
+  // sem ORDER BY o Postgres não garante a mesma ordem entre páginas: linhas se
+  // repetem e outras somem (a apuração perdia ~23% das vendas). Ordem fixa sempre.
+  const ORD={vendas_dia:'data,loja,ean',produtos_loja:'ean,loja',catalogo_fornecedor:'ean,loja'};
+  const tab=path.split('?')[0], ord=campo||ORD[tab];
+  if(ord&&!/[?&]order=/.test(path)) path+=(path.includes('?')?'&':'?')+'order='+ord;
   while(de<limite){
     const r=await fetch(CFG.url+'/rest/v1/'+path,{headers:{apikey:CFG.key,Authorization:'Bearer '+CFG.key,
       Range:`${de}-${de+passo-1}`,'Range-Unit':'items'}});
@@ -525,7 +531,7 @@ async function apurar(silencioso){
     let n=0;
     for(let i=0;i<eans.length;i+=200){
       const parte=eans.slice(i,i+200).map(e=>`"${e}"`).join(',');
-      const vd=await sbPag(`vendas_dia?select=ean,loja,data,qtd&ean=in.(${parte})&data=gte.${corte}`,'',40000);
+      const vd=await sbPag(`vendas_dia?select=ean,loja,data,qtd&ean=in.(${parte})&data=gte.${corte}&order=data,loja,ean`,'',40000);
       vd.forEach(v=>{ S.vendas[`${v.ean}|${v.loja}|${String(v.data).slice(0,10)}`]=+v.qtd||0; n++ });
     }
     S.ultimaApuracao=new Date().toISOString();
@@ -1220,7 +1226,7 @@ function vPainel(m){
     <div><span>Verba consumida</span><b>${fmtR(cons)}</b></div>
     <div><span>Antecipada (já paga)</span><b>${fmtR(cs.filter(c=>c.pagamento==='antecipado').reduce((a,c)=>a+c.orcamento,0))}</b></div>
     <div><span>A faturar (pós-apuração)</span><b>${fmtR(cs.filter(c=>c.pagamento!=='antecipado').reduce((a,c)=>a+consumoCamp(c).verba,0))}</b></div>
-    </div>${S.ultimaApuracao?`<div class="small" style="margin-top:8px">Última apuração: ${dbr(S.ultimaApuracao)} ${S.ultimaApuracao.slice(11,16)}</div>`:''}</div>`));
+    </div>${S.ultimaApuracao?`<div class="small" style="margin-top:8px">Última apuração: ${new Date(S.ultimaApuracao).toLocaleDateString('pt-BR',{timeZone:'America/Recife'})} ${hbr(S.ultimaApuracao)}</div>`:''}</div>`));
   const c=cs.find(x=>x.id===SEL)||cs[0]; SEL=c.id;
   m.appendChild(el(`<div class="card"><label>Campanha</label><select onchange="SEL=this.value;render()">
     ${cs.map(x=>`<option value="${x.id}" ${x.id===c.id?'selected':''}>${fornNome(x.fornKey)} — ${x.nome} (${x.status})</option>`).join('')}</select></div>`));
@@ -1692,7 +1698,7 @@ function vSim(m){
     a mesma tabela que o sync do VR alimenta para o Data Crítica. Só contam as lojas e o período de cada item.</p>
     <div class="kpi">
       <div><span>Itens em promoção agora</span><b>${vig.length}</b></div>
-      <div><span>Última apuração</span><b style="font-size:15px">${S.ultimaApuracao?dbr(S.ultimaApuracao)+' '+S.ultimaApuracao.slice(11,16):'—'}</b></div>
+      <div><span>Última apuração</span><b style="font-size:15px">${S.ultimaApuracao?new Date(S.ultimaApuracao).toLocaleDateString('pt-BR',{timeZone:'America/Recife'})+' '+hbr(S.ultimaApuracao):'—'}</b></div>
       <div><span>Conexão</span><b style="font-size:15px">${ONLINE?'Supabase OK':'demonstração'}</b></div></div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="b" onclick="apurar()" ${ONLINE?'':'disabled'}>Apurar agora (vendas do VR)</button>
