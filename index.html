@@ -446,7 +446,7 @@ const ehGestor=()=>usuario()?.papel==='gestor';
 const usuario=()=>USERS.find(u=>String(u.id)===String(S.perfil));
 function fornDoUsuario(){
   const u=usuario(); if(!u||u.papel==='gestor') return null;
-  const ids=String(u.ids_fornecedor||u.id_fornecedor||'').split(',').map(x=>parseInt(x)).filter(Boolean);
+  const ids=String(u.ids_fornecedor||u.id_fornecedor||'').replace(/[\[\]{}\s"]/g,'').split(',').map(x=>parseInt(x)).filter(Boolean);
   const f=FORN.find(x=>x.ids.some(i=>ids.includes(+i)));
   return f?f.key:null;
 }
